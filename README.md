@@ -1,6 +1,6 @@
 # Shopify + Salesforce Real-Time Sync - Live Demo
 
-Interactive demo of a two-way, real-time sync between Shopify and Salesforce.
+Working demo of a two-way, real-time sync between Shopify and Salesforce.
 Customers, orders and inventory move both ways within seconds.
 
 **Live demo:** https://ricardojose000.github.io/shopify-salesforce-sync-demo/
@@ -9,7 +9,7 @@ Customers, orders and inventory move both ways within seconds.
 
 ## What the demo shows
 
-- New customer in Shopify becomes an Account + Contact in Salesforce
+- New customer in Shopify becomes a Contact in Salesforce
 - Orders arrive with their Order Products, stock levels follow
 - A webhook delivered twice is only processed once
 - Changes made in Salesforce flow back to Shopify, and the echo is skipped (no loops)
