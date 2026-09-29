@@ -283,7 +283,7 @@ svg.lucide { width: 16px; height: 16px; stroke-width: 2; flex: none; }
 .player.paused:not(.ended) .p-big { opacity: 1; transform: none; pointer-events: auto; }
 .p-big:hover { background: #fff; }
 
-.p-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(8, 8, 22, .45);
+.p-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(8, 8, 22, .5); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   opacity: 0; pointer-events: none; transition: opacity .3s; }
 .player.ended .p-end { opacity: 1; pointer-events: auto; }
 .p-endbtn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 12px; font-size: 15px; font-weight: 600;
