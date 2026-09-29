@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Shopify - Salesforce sync (demo)</title>
+  <link rel="preload" as="image" href="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&q=70&fm=jpg">
   <meta name="description" content="Working demo of a two-way Shopify and Salesforce sync for customers, orders and inventory.">
   <meta property="og:title" content="Shopify - Salesforce sync (demo)">
   <meta property="og:image" content="assets/poster.jpg">
@@ -16,13 +17,40 @@
 </head>
 <body>
 
-<header class="bar">
+<section class="wv" id="top">
+  <div class="wv-bg"></div>
+  <div class="wv-in">
+    <div class="wv-head">
+      <b>Shopify &harr; Salesforce sync</b>
+      <span>Walkthrough &middot; 2 min</span>
+    </div>
+    <div class="player paused" id="player">
+      <video id="vid" src="assets/demo.mp4" poster="assets/poster.jpg" autoplay muted playsinline preload="auto"></video>
+      <button class="p-big" id="pBig" aria-label="Play">
+        <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
+      </button>
+      <div class="p-end" id="pEnd">
+        <button class="p-endbtn" id="pReplay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Watch again</button>
+        <a class="p-endbtn light" href="#live">Try the live demo</a>
+      </div>
+      <div class="pc" id="pc">
+        <button class="pc-btn" id="pcPlay" aria-label="Play or pause"></button>
+        <span class="pc-time" id="pcTime">0:00 / 1:55</span>
+        <div class="pc-track" id="pcTrack"><div class="pc-buf" id="pcBuf"></div><div class="pc-fill" id="pcFill"><i></i></div></div>
+        <button class="pc-btn" id="pcFull" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+      </div>
+    </div>
+    <a class="wv-cta" href="#live">Try the live demo yourself<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></a>
+  </div>
+</section>
+
+<header class="bar" id="live">
   <div class="bar-l">
     <b>Shopify &harr; Salesforce sync</b>
     <span>Working demo with sample data</span>
   </div>
   <div class="bar-r">
-    <button class="pbtn" id="openVideo"><i data-lucide="play"></i>Watch video (2 min)</button>
+    <button class="pbtn" id="openVideo"><i data-lucide="play"></i>Watch video</button>
     <button class="pbtn" id="btnReset"><i data-lucide="rotate-ccw"></i>Reset</button>
   </div>
 </header>
@@ -34,15 +62,15 @@
     <div class="s-top" id="sTop"></div>
     <div class="s-body">
       <nav class="s-nav" id="sNav">
-        <a class="dim"><i data-lucide="house"></i>Home</a>
+        <a class="dim" data-na><i data-lucide="house"></i>Home</a>
         <a data-sv="orders" data-q="shop-nav-orders"><i data-lucide="inbox"></i>Orders<span class="s-cnt" id="sOrdCnt"></span></a>
         <a data-sv="inventory" data-q="shop-nav-products"><i data-lucide="tag"></i>Products</a>
         <a data-sv="inventory" class="sub" data-q="shop-nav-inventory">Inventory</a>
         <a data-sv="customers" data-q="shop-nav-customers"><i data-lucide="user"></i>Customers</a>
-        <a class="dim"><i data-lucide="megaphone"></i>Marketing</a>
-        <a class="dim"><i data-lucide="percent"></i>Discounts</a>
-        <a class="dim"><i data-lucide="store"></i>Online Store</a>
-        <a class="dim s-set"><i data-lucide="settings"></i>Settings</a>
+        <a class="dim" data-na><i data-lucide="megaphone"></i>Marketing</a>
+        <a class="dim" data-na><i data-lucide="percent"></i>Discounts</a>
+        <a class="dim" data-na><i data-lucide="store"></i>Online Store</a>
+        <a class="dim s-set" data-na><i data-lucide="settings"></i>Settings</a>
       </nav>
       <div class="s-main" id="sMain"></div>
     </div>
@@ -53,18 +81,18 @@
   <section class="win sfdc" id="sf">
     <div class="sf-top">
       <span class="sf-logo"><span class="logo logo-sf"></span></span>
-      <div class="sf-search"><i data-lucide="search"></i>Search...</div>
-      <div class="sf-icons"><i data-lucide="star"></i><i data-lucide="plus"></i><i data-lucide="circle-help"></i><i data-lucide="settings"></i><i data-lucide="bell"></i><span class="sf-av">SC</span></div>
+      <div class="sf-search" data-na><i data-lucide="search"></i>Search...</div>
+      <div class="sf-icons" data-na><i data-lucide="star"></i><i data-lucide="plus"></i><i data-lucide="circle-help"></i><i data-lucide="settings"></i><i data-lucide="bell"></i><span class="sf-av">SC</span></div>
     </div>
     <div class="sf-nav" id="sfNav">
-      <span class="sf-launch"><i data-lucide="grip"></i></span>
-      <span class="sf-app">Sales</span>
-      <a class="dim">Home</a>
+      <span class="sf-launch" data-na><i data-lucide="grip"></i></span>
+      <span class="sf-app" data-na>Sales</span>
+      <a class="dim" data-na>Home</a>
       <a data-fv="contacts" data-q="sf-nav-contacts">Contacts</a>
-      <a class="dim">Accounts</a>
+      <a class="dim" data-na>Accounts</a>
       <a data-fv="orders" data-q="sf-nav-orders">Orders</a>
       <a data-fv="products" data-q="sf-nav-products">Products</a>
-      <a class="dim">Reports</a>
+      <a class="dim" data-na>Reports</a>
     </div>
     <div class="sf-page" id="sfPage"></div>
     <div class="sf-toast" id="sfToast"></div>
@@ -100,10 +128,6 @@
   Sample data only. Shopify and Salesforce are simulated in your browser, so it's safe to click anything. The sync rules are the same as the real build: records matched by Shopify ID, repeated webhooks ignored, echoes of the sync's own writes skipped, and failed writes retried.
 </footer>
 
-<dialog class="vdlg" id="vdlg">
-  <button class="vclose" id="vclose" aria-label="Close"><i data-lucide="x"></i></button>
-  <video id="vid" src="assets/demo.mp4" poster="assets/poster.jpg" controls playsinline preload="none"></video>
-</dialog>
 
 <script src="app.js"></script>
 </body>

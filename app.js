@@ -125,8 +125,8 @@
       ? `<div class="s-savebar"><span class="s-sb-msg"><i data-lucide="circle-alert"></i>${msg}</span>
            <div class="s-sb-btns"><button class="s-btn-dark" data-act="shopDiscard" data-q="shop-discard">Discard</button><button class="s-btn-light" data-act="shopSave" data-q="shop-save">Save</button></div></div>`
       : `<span class="s-logo"><span class="logo logo-shopify"></span></span>
-         <div class="s-search"><i data-lucide="search"></i>Search<kbd>Ctrl K</kbd></div>
-         <div class="s-store"><span class="s-av">HC</span>Harbour &amp; Co.</div>`;
+         <div class="s-search" data-na><i data-lucide="search"></i>Search<kbd>Ctrl K</kbd></div>
+         <div class="s-store" data-na><span class="s-av">HC</span>Harbour &amp; Co.</div>`;
     icons();
   }
 
@@ -135,7 +135,7 @@
     let h = '';
     if (v === 'customers') {
       h = `<div class="s-head"><h1>Customers</h1><button class="s-btn-primary" data-act="shopNewCustomer" data-q="shop-add-customer">Add customer</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span>Returning</span><span>Email subscribers</span></div>
+        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Returning</span><span data-na>Email subscribers</span></div>
         <table class="s-table"><thead><tr><th>Customer name</th><th>Phone</th><th>Location</th><th class="r">Orders</th></tr></thead><tbody>
         ${sh.customers.map(c => `<tr data-name="${esc(c.first + ' ' + c.last)}"${fl('shop', c.id)}><td><b>${esc(c.first)} ${esc(c.last)}</b><div class="s-sub">${esc(c.email)}</div></td>
           <td data-cell="phone">${esc(c.phone)}</td><td>${esc(c.city)}, Australia</td><td class="r">${c.orders} order${c.orders === 1 ? '' : 's'}</td></tr>`).join('')}
@@ -150,20 +150,20 @@
         </div>
         <div class="s-card s-form"><h2>Default address</h2>
           <div class="s-row2">${field('city', 'City')}${field('state', 'State/territory')}</div>
-          <label class="s-field"><span>Country/region</span><div class="s-select">Australia<i data-lucide="chevron-down"></i></div></label>
+          <label class="s-field"><span>Country/region</span><div class="s-select" data-na>Australia<i data-lucide="chevron-down"></i></div></label>
         </div>`;
     } else if (v === 'orders') {
       const badge = (cls, t) => `<span class="badge ${cls}"><i></i>${t}</span>`;
-      h = `<div class="s-head"><h1>Orders</h1><button class="s-btn-sec" style="margin-left:auto">Export</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span>Unfulfilled</span><span>Unpaid</span><span>Open</span></div>
-        <table class="s-table"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th></tr></thead><tbody>
-        ${sh.orders.map(o => `<tr data-order="${o.name}"${fl('shop', o.id)}><td><b>${o.name}</b></td><td>${timeAgo(o.at)}</td><td>${esc(o.customerName)}</td><td class="r">${money(o.total)}</td>
+      h = `<div class="s-head"><h1>Orders</h1><button class="s-btn-sec" style="margin-left:auto" data-na>Export</button></div>
+        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Unfulfilled</span><span data-na>Unpaid</span><span data-na>Open</span></div>
+        <table class="s-table"><thead><tr><th>Order</th><th class="c-date">Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th></tr></thead><tbody>
+        ${sh.orders.map(o => `<tr data-order="${o.name}"${fl('shop', o.id)}><td><b>${o.name}</b></td><td class="c-date">${timeAgo(o.at)}</td><td>${esc(o.customerName)}</td><td class="r">${money(o.total)}</td>
           <td>${o.financial === 'Refunded' ? badge('ref', 'Refunded') : o.financial === 'Cancelled' ? badge('can', 'Voided') : badge('paid', 'Paid')}</td>
           <td>${o.fulfillment === 'Fulfilled' ? badge('ful', 'Fulfilled') : o.fulfillment === 'Cancelled' ? badge('can', 'Cancelled') : badge('unf', 'Unfulfilled')}</td></tr>`).join('')}
         </tbody></table></div>`;
     } else {
-      h = `<div class="s-head"><h1>Inventory</h1><button class="s-btn-sec" style="margin-left:auto">Export</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span>Harbour &amp; Co. Warehouse</span></div>
+      h = `<div class="s-head"><h1>Inventory</h1><button class="s-btn-sec" style="margin-left:auto" data-na>Export</button></div>
+        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Harbour &amp; Co. Warehouse</span></div>
         <table class="s-table"><thead><tr><th>Product</th><th>SKU</th><th class="r">Price</th><th class="r">Available</th></tr></thead><tbody>
         ${sh.products.map(p => { const dv = UI.inv.get(p.id); return `<tr data-sku="${p.sku}"${fl('shop', p.id)}><td><span class="s-prod"><img class="s-thumb" src="${p.img}" alt="">${esc(p.title)}</span></td><td>${p.sku}</td><td class="r">${money(p.price)}</td>
           <td class="r"><input class="s-num${dv != null ? ' dirty' : ''}" type="text" inputmode="numeric" data-inv="${p.id}" data-q="inv-${p.sku}" value="${dv != null ? esc(dv) : p.stock}"></td></tr>`; }).join('')}
@@ -204,21 +204,21 @@
       return `<td class="sf-ed${changed ? ' edited' : ''}">${esc(val)}<button class="sf-pen" title="Edit ${field}" data-act="sfEditStart" data-obj="${obj}" data-id="${rec.Id}" data-field="${field}" data-q="${q}"><span class="slds ic-edit"></span></button></td>`;
     };
     let h = '';
-    const head = (icon, color, obj, lv, n, btns = '<button class="sf-btn">New</button><button class="sf-btn">Import</button>') => `
+    const head = (icon, color, obj, lv, n, btns = '<button class="sf-btn" data-na>New</button><button class="sf-btn" data-na>Import</button>') => `
       <div class="sf-lvh"><span class="sf-oicon" style="--c:${color}"><span class="slds ${icon}"></span></span>
-        <div><div class="sf-obj">${obj}</div><div class="sf-lv">${lv}<span class="slds ic-down"></span></div></div>
+        <div><div class="sf-obj">${obj}</div><div class="sf-lv" data-na>${lv}<span class="slds ic-down"></span></div></div>
         <div class="sf-btns">${btns}</div></div>
       <div class="sf-info">${n} item${n === 1 ? '' : 's'} &bull; Sorted by ${v === 'orders' ? 'Order Number' : 'Name'} &bull; Updated a few seconds ago</div>`;
     if (v === 'contacts') {
       h = head('ic-contact', '#A094ED', 'Contacts', 'All Contacts', sf.contacts.length) + `
         <table class="sf-table"><thead><tr><th class="num"></th><th>Name</th><th>Account Name</th><th>Phone</th><th>Email</th><th>Shopify ID</th></tr></thead><tbody>
-        ${sf.contacts.map((c, i) => `<tr data-name="${esc(c.FirstName + ' ' + c.LastName)}"${fl('sf', c.Id)}><td class="num">${i + 1}</td><td><span class="sf-link">${esc(c.FirstName)} ${esc(c.LastName)}</span></td>
-          <td><span class="sf-link">${esc(c.Account)}</span></td>${editCell('contact', c, 'Phone', c.Phone, 'sf-pen-phone-' + c.FirstName)}<td>${esc(c.Email)}</td><td class="sf-mono">${c.ShopifyId}</td></tr>`).join('')}
+        ${sf.contacts.map((c, i) => `<tr data-name="${esc(c.FirstName + ' ' + c.LastName)}"${fl('sf', c.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${esc(c.FirstName)} ${esc(c.LastName)}</span></td>
+          <td><span class="sf-link" data-na>${esc(c.Account)}</span></td>${editCell('contact', c, 'Phone', c.Phone, 'sf-pen-phone-' + c.FirstName)}<td>${esc(c.Email)}</td><td class="sf-mono">${c.ShopifyId}</td></tr>`).join('')}
         </tbody></table>`;
     } else if (v === 'orders') {
-      h = head('ic-orders', '#769ED9', 'Orders', 'All Orders', sf.orders.length, '<button class="sf-btn solo">New</button>') + `
+      h = head('ic-orders', '#769ED9', 'Orders', 'All Orders', sf.orders.length, '<button class="sf-btn solo" data-na>New</button>') + `
         <table class="sf-table"><thead><tr><th class="num"></th><th>Order Number</th><th>Account Name</th><th>Order Start Date</th><th>Status</th><th class="r">Order Amount</th><th>Shopify Order</th><th></th></tr></thead><tbody>
-        ${sf.orders.map((o, i) => `<tr data-order="${o.ShopifyName}"${fl('sf', o.Id)}><td class="num">${i + 1}</td><td><span class="sf-link">${o.OrderNumber}</span></td><td><span class="sf-link">${esc(o.Account)}</span></td>
+        ${sf.orders.map((o, i) => `<tr data-order="${o.ShopifyName}"${fl('sf', o.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${o.OrderNumber}</span></td><td><span class="sf-link" data-na>${esc(o.Account)}</span></td>
           <td>${o.Start}</td><td>${o.Status}</td><td class="r">${money(o.Amount)}</td><td class="sf-mono">${o.ShopifyName}</td>
           <td style="width:40px"><button class="sf-rowact" data-act="sfMenu" data-id="${o.Id}" data-q="sf-rowact-${o.ShopifyName.slice(1)}"><span class="slds ic-down"></span></button>
           ${UI.sfMenu === o.Id ? `<div class="sf-menu"><a data-act="sfStatus" data-id="${o.Id}" data-status="Fulfilled" data-q="sf-mark-fulfilled">Mark as Fulfilled</a><a data-act="sfStatus" data-id="${o.Id}" data-status="Refunded">Mark as Refunded</a><a data-act="sfStatus" data-id="${o.Id}" data-status="Cancelled">Cancel Order</a></div>` : ''}</td></tr>`).join('')}
@@ -226,7 +226,7 @@
     } else {
       h = head('ic-product', '#B781D3', 'Products', 'All Products', sf.products.length) + `
         <table class="sf-table"><thead><tr><th class="num"></th><th>Product Name</th><th>Product Code</th><th>Stock</th><th class="r">List Price</th></tr></thead><tbody>
-        ${sf.products.map((p, i) => `<tr data-sku="${p.ProductCode}"${fl('sf', p.Id)}><td class="num">${i + 1}</td><td><span class="sf-link">${esc(p.Name)}</span></td><td>${p.ProductCode}</td>
+        ${sf.products.map((p, i) => `<tr data-sku="${p.ProductCode}"${fl('sf', p.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${esc(p.Name)}</span></td><td>${p.ProductCode}</td>
           ${editCell('product', p, 'Stock', p.Stock, 'sf-pen-stock-' + p.ProductCode)}<td class="r">${money(p.UnitPrice)}</td></tr>`).join('')}
         </tbody></table>`;
     }
@@ -237,8 +237,9 @@
   }
 
   let fToastT;
-  function sfToast(msg) {
-    const t = $('#sfToast'); t.innerHTML = `<i data-lucide="circle-check"></i>${esc(msg)}`; icons(); t.classList.add('show');
+  function sfToast(msg, info) {
+    const t = $('#sfToast'); t.innerHTML = `<i data-lucide="${info ? 'info' : 'circle-check'}"></i>${esc(msg)}`; icons();
+    t.classList.toggle('info', !!info); t.classList.add('show');
     clearTimeout(fToastT); fToastT = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
@@ -291,6 +292,7 @@
     el.className = 'lg-sys ' + (up ? 'up' : 'down');
     el.textContent = `${clock()}  ${text}`;
     logBody.prepend(el);
+    logBody.scrollTop = 0;
   }
   logBody.addEventListener('click', e => { const r = e.target.closest('.lg-row'); if (r) r.parentElement.classList.toggle('open'); });
   async function step(T, text, detail, ms, kind) { T.step(text, detail, kind); await sleep(ms); }
@@ -635,6 +637,12 @@
     if (nav) { A.shopView(nav.dataset.sv); return; }
     const fnav = e.target.closest('[data-fv]');
     if (fnav) { A.sfView(fnav.dataset.fv); return; }
+    const na = e.target.closest('[data-na]');
+    if (na) {
+      if (na.closest('#sf')) sfToast('Not part of this demo. Try Contacts, Orders or Products.', true);
+      else shopToast('Not part of this demo. Try Customers, Orders or Inventory.');
+      return;
+    }
     const b = e.target.closest('[data-act]');
     if (!b) { if (UI.sfMenu && !e.target.closest('.sf-menu')) { UI.sfMenu = null; renderSf(); } return; }
     const d = b.dataset;
@@ -673,11 +681,55 @@
   $('#outage').addEventListener('change', e => A.outage(e.target.checked));
   $('#btnReset').addEventListener('click', reset);
 
-  const dlg = $('#vdlg'), vid = $('#vid');
-  $('#openVideo').addEventListener('click', () => { dlg.showModal(); vid.play().catch(() => {}); });
-  $('#vclose').addEventListener('click', () => dlg.close());
-  dlg.addEventListener('close', () => vid.pause());
-  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  /* ---------------------------------------------------------------- walkthrough player */
+  const player = $('#player'), vid = $('#vid');
+  if (player && !EMBED) {
+    const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+    const ICON_PAUSE = '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>';
+    const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const sync = () => { player.classList.toggle('paused', vid.paused); $('#pcPlay').innerHTML = vid.paused ? ICON_PLAY : ICON_PAUSE; };
+    const tick = () => {
+      const d = vid.duration || 0;
+      $('#pcFill').style.width = d ? (vid.currentTime / d * 100) + '%' : '0';
+      $('#pcTime').textContent = fmt(vid.currentTime) + ' / ' + fmt(d || 115);
+      if (d && vid.buffered.length) $('#pcBuf').style.width = (vid.buffered.end(vid.buffered.length - 1) / d * 100) + '%';
+    };
+    const toggle = () => { if (player.classList.contains('ended')) return; if (vid.paused) vid.play().catch(() => {}); else vid.pause(); };
+    let uiT;
+    const showUi = () => { player.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => player.classList.remove('ui'), 2200); };
+    vid.addEventListener('play', () => { player.classList.remove('ended'); sync(); });
+    vid.addEventListener('pause', sync);
+    ['timeupdate', 'loadedmetadata', 'progress', 'seeked'].forEach(ev => vid.addEventListener(ev, tick));
+    vid.addEventListener('ended', () => { player.classList.add('ended'); sync(); });
+    vid.addEventListener('click', () => { toggle(); showUi(); });
+    player.addEventListener('mousemove', showUi);
+    $('#pBig').addEventListener('click', () => vid.play().catch(() => {}));
+    $('#pcPlay').addEventListener('click', () => { toggle(); showUi(); });
+    $('#pReplay').addEventListener('click', () => { vid.currentTime = 0; vid.play().catch(() => {}); });
+    $('#pcFull').addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (player.requestFullscreen) player.requestFullscreen();
+      else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
+    });
+    const track = $('#pcTrack');
+    const seek = e => { const r = track.getBoundingClientRect(); const x = Math.min(Math.max(e.clientX - r.left, 0), r.width); if (vid.duration) vid.currentTime = x / r.width * vid.duration; tick(); };
+    track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); track.classList.add('drag'); player.classList.remove('ended'); seek(e); });
+    track.addEventListener('pointermove', e => { if (track.classList.contains('drag')) { seek(e); showUi(); } });
+    track.addEventListener('pointerup', () => track.classList.remove('drag'));
+    document.addEventListener('keydown', e => {
+      if (e.code !== 'Space' || (e.target.closest && e.target.closest('input, textarea, button, select'))) return;
+      const r = player.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight) { e.preventDefault(); toggle(); showUi(); }
+    });
+    // stop playing once it's scrolled out of view
+    new IntersectionObserver(([en]) => { if (!en.isIntersecting && !vid.paused) vid.pause(); }, { threshold: 0.2 }).observe(player);
+    sync(); tick();
+    vid.play().catch(() => sync());
+    $('#openVideo').addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => { if (vid.ended) vid.currentTime = 0; vid.play().catch(() => {}); }, 500);
+    });
+  }
 
   // keep row highlights fading correctly after re-renders
   const st = document.createElement('style');
