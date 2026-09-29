@@ -2,6 +2,10 @@
   'use strict';
 
   const $ = (s, r = document) => r.querySelector(s);
+  const EMBED = new URLSearchParams(location.search).has('embed');
+  if (EMBED) document.documentElement.classList.add('embed');
+  const tell3d = detail => window.dispatchEvent(new CustomEvent('sync3d', { detail }));
+  let evSeq = 0;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const rnd = n => Math.floor(Math.random() * n);
   const pick = a => a[rnd(a.length)];
@@ -40,7 +44,7 @@
 
   /* ---------------------------------------------------------------- state */
   let S;
-  const UI = { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null };
+  const UI = { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null, dd: null };
 
   function freshState() {
     const s = {
@@ -100,6 +104,17 @@
   }
   const rowCls = (side, id) => 'row' + (marks.has(side + ':' + id) && performance.now() - marks.get(side + ':' + id).t < 2600 ? ' fresh' : '');
 
+  /* ---------------------------------------------------------------- split-flap numbers */
+  const flaps = new Map();
+  function flap(key, v) {
+    let f = flaps.get(key);
+    if (!f) { f = { v, prev: v, t: -1e9 }; flaps.set(key, f); }
+    else if (f.v !== v) { f.prev = f.v; f.v = v; f.t = performance.now(); }
+    const el = performance.now() - f.t;
+    if (el > 700) return `<span class="flap"><span class="fl-top">${v}</span><span class="fl-bot">${v}</span></span>`;
+    return `<span class="flap" style="--fd:-${el | 0}ms"><span class="fl-top">${v}</span><span class="fl-bot">${f.prev}</span><span class="fl-a">${f.prev}</span><span class="fl-b">${v}</span></span>`;
+  }
+
   /* ---------------------------------------------------------------- rendering */
   function keepFocus(container, html) {
     const a = document.activeElement;
@@ -131,7 +146,7 @@
         h += `<div class="lead-act"><button class="pill" data-act="formOpen">Add a customer</button><span class="note">It shows up in Salesforce as a Contact.</span></div>`;
       }
       h += '<ul class="rows">' + sh.customers.map(c => `
-        <li class="${rowCls('shop', c.id)}"${freshAttr('shop', c.id)}>
+        <li class="${rowCls('shop', c.id)}" data-name="${esc(c.first + ' ' + c.last)}"${freshAttr('shop', c.id)}>
           <div class="r-main"><span class="r-name">${esc(c.first)} ${esc(c.last)}</span><span class="r-meta">${esc(c.email)} &middot; ${esc(c.city)}</span></div>
           <div class="r-side">${editing('shop', 'phone', c.id) ? editBox() : `<span class="mono">${esc(c.phone)}</span><button class="txt" data-act="editStart" data-side="shop" data-kind="phone" data-id="${c.id}">Edit</button>`}</div>
         </li>`).join('') + '</ul>';
@@ -141,17 +156,17 @@
         const items = o.lines.reduce((n, l) => n + l.qty, 0);
         const ful = o.fulfillment === 'Unfulfilled' ? '<span class="warn">Unfulfilled</span>' : o.fulfillment === 'Cancelled' ? '<span class="bad">Cancelled</span>' : 'Fulfilled';
         const fin = o.financial === 'Cancelled' ? 'Voided' : o.financial;
-        return `<li class="${rowCls('shop', o.id)}"${freshAttr('shop', o.id)}>
+        return `<li class="${rowCls('shop', o.id)}" data-order="${o.name}"${freshAttr('shop', o.id)}>
           <div class="r-main"><span class="r-name">${o.name} &middot; ${esc(o.customerName)}</span><span class="r-meta">${plural(items, 'item')} &middot; ${money(o.total)}</span></div>
           <div class="r-side"><span class="status">${fin} &middot; ${ful}</span>${o.fulfillment === 'Unfulfilled' ? `<button class="txt" data-act="fulfil" data-id="${o.id}">Fulfil</button>` : ''}</div>
         </li>`;
       }).join('') + '</ul>';
     } else {
       h += '<ul class="rows">' + sh.products.map(p => `
-        <li class="${rowCls('shop', p.id)}"${freshAttr('shop', p.id)}>
+        <li class="${rowCls('shop', p.id)}" data-sku="${p.sku}"${freshAttr('shop', p.id)}>
           <img class="thumb" src="${p.img}" alt="">
           <div class="r-main"><span class="r-name">${esc(p.title)}</span><span class="r-meta">${p.sku} &middot; ${money(p.price)}</span></div>
-          <div class="r-side stepper"><button data-act="shopStock" data-id="${p.id}" data-d="-1" aria-label="One less">&minus;</button><span class="q">${p.stock}</span><button data-act="shopStock" data-id="${p.id}" data-d="1" aria-label="One more">+</button></div>
+          <div class="r-side stepper"><button data-act="shopStock" data-id="${p.id}" data-d="-1" aria-label="One less">&minus;</button>${flap('shop:' + p.id, p.stock)}<button data-act="shopStock" data-id="${p.id}" data-d="1" aria-label="One more">+</button></div>
         </li>`).join('') + '</ul>';
     }
     keepFocus($('#shopBody'), h);
@@ -163,21 +178,21 @@
     let h = '<ul class="rows">';
     if (t === 'contacts') {
       h += sf.contacts.map(c => `
-        <li class="${rowCls('sf', c.Id)}"${freshAttr('sf', c.Id)}>
+        <li class="${rowCls('sf', c.Id)}" data-name="${esc(c.FirstName + ' ' + c.LastName)}"${freshAttr('sf', c.Id)}>
           <div class="r-main"><span class="r-name">${esc(c.FirstName)} ${esc(c.LastName)}</span><span class="r-meta">Shopify ID ${c.ShopifyId} &middot; ${esc(c.Email)}</span></div>
           <div class="r-side">${editing('sf', 'phone', c.Id) ? editBox() : `<span class="mono">${esc(c.Phone)}</span><button class="txt" data-act="editStart" data-side="sf" data-kind="phone" data-id="${c.Id}">Edit</button>`}</div>
         </li>`).join('');
     } else if (t === 'orders') {
       h += sf.orders.map(o => `
-        <li class="${rowCls('sf', o.Id)}"${freshAttr('sf', o.Id)}>
+        <li class="${rowCls('sf', o.Id)}" data-order="${o.ShopifyName}"${freshAttr('sf', o.Id)}>
           <div class="r-main"><span class="r-name">${o.OrderNumber} &middot; ${esc(o.Account)}</span><span class="r-meta">${plural(o.Lines, 'order product')} &middot; ${money(o.Amount)} &middot; Shopify ${o.ShopifyName}</span></div>
-          <div class="r-side"><select class="sel" data-status="${o.Id}" aria-label="Order status">${['Paid', 'Fulfilled', 'Refunded', 'Cancelled'].map(s => `<option${s === o.Status ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+          <div class="r-side"><div class="dd${UI.dd === o.Id ? ' open' : ''}"><button class="dd-btn" data-act="ddOpen" data-id="${o.Id}" aria-haspopup="listbox">${o.Status}<svg viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>${UI.dd === o.Id ? `<ul class="dd-menu" role="listbox">${['Paid', 'Fulfilled', 'Refunded', 'Cancelled'].map(s => `<li><button class="${s === o.Status ? 'cur' : ''}" data-act="ddPick" data-id="${o.Id}" data-v="${s}">${s === 'Paid' ? 'Paid' : s === 'Fulfilled' ? 'Mark as fulfilled' : s === 'Refunded' ? 'Mark as refunded' : 'Cancel order'}</button></li>`).join('')}</ul>` : ''}</div></div>
         </li>`).join('');
     } else {
       h += sf.products.map(p => `
-        <li class="${rowCls('sf', p.Id)}"${freshAttr('sf', p.Id)}>
+        <li class="${rowCls('sf', p.Id)}" data-sku="${p.ProductCode}"${freshAttr('sf', p.Id)}>
           <div class="r-main"><span class="r-name">${esc(p.Name)}</span><span class="r-meta">${p.ProductCode} &middot; ${money(p.UnitPrice)}</span></div>
-          <div class="r-side stepper"><button data-act="sfStock" data-id="${p.Id}" data-d="-1" aria-label="One less">&minus;</button><span class="q">${p.Stock}</span><button data-act="sfStock" data-id="${p.Id}" data-d="1" aria-label="One more">+</button></div>
+          <div class="r-side stepper"><button data-act="sfStock" data-id="${p.Id}" data-d="-1" aria-label="One less">&minus;</button>${flap('sf:' + p.Id, p.Stock)}<button data-act="sfStock" data-id="${p.Id}" data-d="1" aria-label="One more">+</button></div>
         </li>`).join('');
     }
     keepFocus($('#sfBody'), h + '</ul>');
@@ -214,6 +229,8 @@
     while (entries.children.length > 60) entries.lastElementChild.remove();
     entries.scrollTop = 0;
     const t0 = performance.now();
+    const id3 = ++evSeq;
+    tell3d({ type: 'start', id: id3, dir });
     return {
       t0, el,
       step(text, detail, kind) {
@@ -225,6 +242,7 @@
         el.classList.remove('run', 'ok', 'dup', 'loop', 'retry', 'recovered', 'fail');
         el.classList.add(kind);
         el.querySelector('.res').textContent = RES[kind] + (took ? ' · ' + took : '');
+        tell3d({ type: 'status', id: id3, kind });
       },
     };
   }
@@ -583,6 +601,7 @@
     outage(on) {
       if (S.eng.sfDown === on) return;
       S.eng.sfDown = on;
+      tell3d({ type: 'outage', on });
       if (UI.edit && UI.edit.side === 'sf') UI.edit = null;
       sysLine(on ? 'Salesforce went offline (simulated)' : 'Salesforce is back online', !on);
       renderSf();
@@ -596,6 +615,7 @@
     const ft = e.target.closest('[data-ft]');
     if (ft) { UI.sfTab = ft.dataset.ft; UI.edit = null; renderSf(); return; }
     const b = e.target.closest('[data-act]');
+    if (UI.dd && !(b && (b.dataset.act === 'ddPick' || b.dataset.act === 'ddOpen'))) { UI.dd = null; renderSf(); }
     if (!b) return;
     const d = b.dataset;
     switch (d.act) {
@@ -609,6 +629,8 @@
       case 'fulfil': A.fulfil(d.id); break;
       case 'shopStock': A.shopStock(d.id, +d.d); break;
       case 'sfStock': A.sfStock(d.id, +d.d); break;
+      case 'ddOpen': UI.dd = UI.dd === d.id ? null : d.id; renderSf(); break;
+      case 'ddPick': UI.dd = null; A.sfStatus(d.id, d.v); renderSf(); break;
     }
   });
   document.addEventListener('input', e => {
@@ -616,7 +638,6 @@
     if (t.dataset.f && UI.form) UI.form[t.dataset.f] = t.value;
     else if (t.hasAttribute('data-edit') && UI.edit) UI.edit.value = t.value;
   });
-  document.addEventListener('change', e => { const s = e.target.closest('[data-status]'); if (s) A.sfStatus(s.dataset.status, s.value); });
   document.addEventListener('keydown', e => {
     const t = e.target;
     if (!t || !t.dataset) return;
@@ -630,7 +651,7 @@
   $('#btnReset').addEventListener('click', reset);
 
   // pause background footage that is off screen, and respect reduced motion
-  const vids = [...document.querySelectorAll('video')];
+  const vids = [...document.querySelectorAll('video[autoplay]')];
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (still) vids.forEach(v => { v.removeAttribute('autoplay'); v.pause(); });
   else if ('IntersectionObserver' in window) {
@@ -638,11 +659,71 @@
     vids.forEach(v => io.observe(v));
   }
 
+  /* ---------------------------------------------------------------- reveals and tilt */
+  const revealIO = 'IntersectionObserver' in window ? new IntersectionObserver(list => list.forEach(en => {
+    if (en.isIntersecting) { en.target.classList.add('in'); revealIO.unobserve(en.target); }
+  }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }) : null;
+  document.querySelectorAll('.reveal').forEach(el => revealIO ? revealIO.observe(el) : el.classList.add('in'));
+  document.querySelectorAll('.tilt').forEach(fig => {
+    fig.addEventListener('pointermove', e => {
+      const r = fig.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      fig.style.setProperty('--ry', (x * 7).toFixed(2) + 'deg');
+      fig.style.setProperty('--rx', (-y * 5).toFixed(2) + 'deg');
+    });
+    fig.addEventListener('pointerleave', () => { fig.style.setProperty('--ry', '0deg'); fig.style.setProperty('--rx', '0deg'); });
+  });
+
+  /* ---------------------------------------------------------------- guide player */
+  const player = $('#player'), vid = $('#vid');
+  if (player && vid && !EMBED) {
+    const PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+    const PAUSE = '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" fill="currentColor"/><rect x="13.9" y="5" width="3.6" height="14" fill="currentColor"/></svg>';
+    const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const chapters = [...document.querySelectorAll('#chapters li')];
+    const sync = () => { player.classList.toggle('paused', vid.paused); $('#pcPlay').innerHTML = vid.paused ? PLAY : PAUSE; };
+    const tick = () => {
+      const d = vid.duration || 0;
+      $('#pcFill').style.width = d ? (vid.currentTime / d * 100) + '%' : '0';
+      $('#pcTime').textContent = fmt(vid.currentTime) + (d ? ' / ' + fmt(d) : '');
+      let cur = -1;
+      chapters.forEach((li, i) => { if (vid.currentTime + 0.05 >= +li.dataset.t) cur = i; });
+      chapters.forEach((li, i) => li.classList.toggle('on', i === cur && vid.currentTime > 0));
+    };
+    const toggle = () => { if (player.classList.contains('ended')) return; if (vid.paused) vid.play().catch(() => {}); else vid.pause(); };
+    let uiT;
+    const showUi = () => { player.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => player.classList.remove('ui'), 2200); };
+    vid.addEventListener('play', () => { player.classList.remove('ended'); sync(); });
+    vid.addEventListener('pause', sync);
+    ['timeupdate', 'loadedmetadata', 'seeked'].forEach(ev => vid.addEventListener(ev, tick));
+    vid.addEventListener('ended', () => { player.classList.add('ended'); sync(); });
+    vid.addEventListener('click', () => { toggle(); showUi(); });
+    player.addEventListener('pointermove', showUi);
+    $('#pBig').addEventListener('click', () => vid.play().catch(() => {}));
+    $('#pcPlay').addEventListener('click', () => { toggle(); showUi(); });
+    $('#pReplay').addEventListener('click', () => { vid.currentTime = 0; vid.play().catch(() => {}); });
+    $('#pcFull').addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (player.requestFullscreen) player.requestFullscreen();
+      else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
+    });
+    const track = $('#pcTrack');
+    const seek = e => { const r = track.getBoundingClientRect(); const x = Math.min(Math.max(e.clientX - r.left, 0), r.width); if (vid.duration) vid.currentTime = x / r.width * vid.duration; tick(); };
+    track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); track.dataset.drag = '1'; player.classList.remove('ended'); seek(e); });
+    track.addEventListener('pointermove', e => { if (track.dataset.drag) { seek(e); showUi(); } });
+    track.addEventListener('pointerup', () => { delete track.dataset.drag; });
+    chapters.forEach(li => li.addEventListener('click', () => { player.classList.remove('ended'); vid.currentTime = +li.dataset.t; vid.play().catch(() => {}); }));
+    new IntersectionObserver(([en]) => { if (!en.isIntersecting && !vid.paused) vid.pause(); }, { threshold: 0.2 }).observe(player);
+    sync(); tick();
+  }
+
   function reset() {
     S = freshState();
     RQ.length = 0; Q.length = 0; marks.clear();
     stockTimers.forEach(t => clearTimeout(t)); stockTimers.clear();
-    Object.assign(UI, { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null });
+    Object.assign(UI, { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null, dd: null });
+    flaps.clear();
+    tell3d({ type: 'reset' });
     emptyLog();
     render();
   }

@@ -15,6 +15,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="https://assets.mixkit.co/videos/31218/31218-thumb-1080-0.jpg">
   <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  } }
+  </script>
 </head>
 <body>
 
@@ -22,6 +28,7 @@
   <div class="wrap top-in">
     <a class="wordmark" href="#top">Shopify <i>&amp;</i> Salesforce</a>
     <nav>
+      <a href="#guide">How to use it</a>
       <a href="#demo">The demo</a>
       <a href="#how">How it works</a>
       <a href="#map">What syncs</a>
@@ -36,26 +43,61 @@
   </video>
   <div class="hero-shade"></div>
   <div class="wrap hero-in">
-    <p class="kicker light">A working demo, with sample data</p>
-    <h1>Shopify and Salesforce,<br><i>kept in step.</i></h1>
-    <p class="hero-lede">Customers, orders and stock move between your store and your CRM within seconds, in both directions. The demo below runs in your browser, so click whatever you like.</p>
-    <div class="hero-cta">
-      <a class="btn paper" href="#demo">Try the demo</a>
-      <a class="under light" href="#how">How it works</a>
+    <p class="kicker light rise" style="--i:0">A working demo, with sample data</p>
+    <h1><span class="ln" style="--i:1">Shopify and Salesforce,</span><span class="ln" style="--i:2"><i>kept in step.</i></span></h1>
+    <p class="hero-lede rise" style="--i:3">Customers, orders and stock move between your store and your CRM within seconds, in both directions. Watch the short guide, then try it yourself.</p>
+    <div class="hero-cta rise" style="--i:4">
+      <a class="btn paper" href="#guide">Watch the guide</a>
+      <a class="under light" href="#demo">Go straight to the demo</a>
     </div>
   </div>
-  <a class="scroll-cue" href="#demo" aria-label="Scroll to the demo"><span></span></a>
+  <a class="scroll-cue" href="#guide" aria-label="Scroll down"><span></span></a>
 </section>
 
-<section class="sec" id="demo">
+<section class="sec" id="guide">
   <div class="wrap">
-    <div class="sec-head">
-      <div class="num"><span>01</span>The demo</div>
+    <div class="sec-head reveal">
+      <div class="num"><span>01</span>How to use it</div>
+      <h2>Start to finish, <i>in two minutes.</i></h2>
+      <p>Where to click, and what to look for in the sync log. Everything in the video can be done in the demo just below.</p>
+    </div>
+    <div class="guide reveal">
+      <div class="player paused" id="player">
+        <video id="vid" src="assets/guide.mp4" poster="assets/guide.jpg" playsinline preload="metadata"></video>
+        <button class="p-big" id="pBig" aria-label="Play the guide"><span class="tri"></span><span class="p-lbl">Play the guide</span></button>
+        <div class="p-end" id="pEnd">
+          <button class="pill light" id="pReplay">Watch again</button>
+          <a class="pill solid-light" href="#demo">Try it yourself</a>
+        </div>
+        <div class="pc" id="pc">
+          <button class="pc-btn" id="pcPlay" aria-label="Play or pause"></button>
+          <span class="pc-time" id="pcTime">0:00</span>
+          <div class="pc-track" id="pcTrack"><div class="pc-fill" id="pcFill"></div></div>
+          <button class="pc-btn" id="pcFull" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg></button>
+        </div>
+      </div>
+      <ol class="chapters" id="chapters">
+        <li data-t="5.6"><span>0:05</span>Add a customer in Shopify</li>
+        <li data-t="30.2"><span>0:30</span>A store order comes in</li>
+        <li data-t="40.8"><span>0:40</span>The same webhook, twice</li>
+        <li data-t="52.9"><span>0:52</span>Edit a contact in Salesforce</li>
+        <li data-t="68.0"><span>1:08</span>Mark an order fulfilled</li>
+        <li data-t="78.3"><span>1:18</span>Salesforce goes offline</li>
+        <li data-t="97.6"><span>1:37</span>Correct stock in Salesforce</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="sec alt" id="demo">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="num"><span>02</span>The demo</div>
       <h2>Make a change on <i>either side.</i></h2>
       <p>Add a customer or change stock in Shopify, or edit a phone number or order status in Salesforce. The sync log shows every step it takes, as it happens.</p>
     </div>
 
-    <div class="board">
+    <div class="board reveal">
       <!-- Shopify -->
       <div class="col" id="shop">
         <div class="col-head">
@@ -72,6 +114,9 @@
           <span class="col-label">In between</span>
           <h3>The sync log</h3>
           <button class="txt reset" id="btnReset">Reset demo</button>
+        </div>
+        <div class="scene" id="scene3d" aria-hidden="true">
+          <span class="lbl l-shop">Shopify</span><span class="lbl l-hub">Sync</span><span class="lbl l-sf">Salesforce</span>
         </div>
         <p class="tally" id="tally"></p>
         <div class="tools">
@@ -96,22 +141,22 @@
   </div>
 </section>
 
-<section class="sec alt" id="how">
+<section class="sec" id="how">
   <div class="wrap">
-    <div class="sec-head">
-      <div class="num"><span>02</span>How it works</div>
+    <div class="sec-head reveal">
+      <div class="num"><span>03</span>How it works</div>
       <h2>Two teams, <i>one set of records.</i></h2>
       <p>A small sync service sits between the two systems. Each side tells it the moment something changes, and it writes the change to the other side.</p>
     </div>
 
     <div class="scenes">
-      <figure>
+      <figure class="tilt reveal">
         <video autoplay muted loop playsinline preload="metadata" poster="https://assets.mixkit.co/videos/42137/42137-thumb-720-0.jpg">
           <source src="https://assets.mixkit.co/videos/42137/42137-720.mp4" type="video/mp4">
         </video>
         <figcaption><b>In the store.</b> An order is packed and marked fulfilled in Shopify. Salesforce shows it seconds later.</figcaption>
       </figure>
-      <figure>
+      <figure class="tilt reveal">
         <video autoplay muted loop playsinline preload="metadata" poster="https://assets.mixkit.co/videos/42652/42652-thumb-720-0.jpg">
           <source src="https://assets.mixkit.co/videos/42652/42652-720.mp4" type="video/mp4">
         </video>
@@ -120,22 +165,22 @@
     </div>
 
     <ol class="points">
-      <li><span>01</span><div><b>Shopify speaks first.</b> Signed webhooks arrive the moment a customer, order or stock level changes. Anything without a valid signature is turned away.</div></li>
-      <li><span>02</span><div><b>Matched, never duplicated.</b> Every Salesforce record keeps its Shopify ID, so a change updates the right record. A webhook sent twice is only processed once.</div></li>
-      <li><span>03</span><div><b>Salesforce answers back.</b> Change Data Capture reports edits made by your team, and the sync writes them to Shopify. Its own writes are recognised, so nothing loops.</div></li>
-      <li><span>04</span><div><b>Nothing gets lost.</b> If either side is down, changes wait in a retry queue and go through once it's back. Every step is logged with a reason.</div></li>
+      <li class="reveal"><span>01</span><div><b>Shopify speaks first.</b> Signed webhooks arrive the moment a customer, order or stock level changes. Anything without a valid signature is turned away.</div></li>
+      <li class="reveal"><span>02</span><div><b>Matched, never duplicated.</b> Every Salesforce record keeps its Shopify ID, so a change updates the right record. A webhook sent twice is only processed once.</div></li>
+      <li class="reveal"><span>03</span><div><b>Salesforce answers back.</b> Change Data Capture reports edits made by your team, and the sync writes them to Shopify. Its own writes are recognised, so nothing loops.</div></li>
+      <li class="reveal"><span>04</span><div><b>Nothing gets lost.</b> If either side is down, changes wait in a retry queue and go through once it's back. Every step is logged with a reason.</div></li>
     </ol>
   </div>
 </section>
 
-<section class="sec" id="map">
+<section class="sec alt" id="map">
   <div class="wrap">
-    <div class="sec-head">
-      <div class="num"><span>03</span>What syncs</div>
+    <div class="sec-head reveal">
+      <div class="num"><span>04</span>What syncs</div>
       <h2>Standard objects, <i>both sides.</i></h2>
       <p>The mapping lives in one plain settings file, so it can change later without touching the code.</p>
     </div>
-    <table class="map">
+    <table class="map reveal">
       <thead><tr><th>Shopify</th><th>Salesforce</th><th>Direction</th><th>Fields</th></tr></thead>
       <tbody>
         <tr><td>Customer</td><td>Account and Contact</td><td>Both ways</td><td>Name, email, phone, addresses, email opt-out</td></tr>
@@ -156,5 +201,6 @@
 </footer>
 
 <script src="app.js"></script>
+<script type="module" src="scene3d.js"></script>
 </body>
 </html>
