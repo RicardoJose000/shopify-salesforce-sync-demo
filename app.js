@@ -2,13 +2,9 @@
   'use strict';
 
   const $ = (s, r = document) => r.querySelector(s);
-  const EMBED = new URLSearchParams(location.search).has('embed');
-  if (EMBED) document.documentElement.classList.add('embed');
-
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const rnd = n => Math.floor(Math.random() * n);
   const pick = a => a[rnd(a.length)];
-  const icons = () => window.lucide && lucide.createIcons();
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const B62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -19,12 +15,9 @@
   const money = n => '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const phone = () => `04${rnd(10)}${rnd(10)} ${100 + rnd(900)} ${100 + rnd(900)}`;
   const clock = () => new Date().toLocaleTimeString('en-AU', { hour12: false });
-  const timeAgo = t => { const d = new Date(t); const s = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, ' ').toLowerCase(); return (new Date().toDateString() === d.toDateString() ? 'Today ' : 'Yesterday ') + s; };
-  const today = () => new Date().toLocaleDateString('en-AU');
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
   const IMG = id => `https://images.unsplash.com/photo-${id}?w=96&h=96&fit=crop&auto=format&q=70`;
-  const AV = (g, n) => `https://randomuser.me/api/portraits/${g}/${n}.jpg`;
-
   const PRODUCTS = [
     { key: 'wat', title: 'Minimal Smart Watch', sku: 'HC-WAT-01', price: 249, stock: 18, img: IMG('1523275335684-37898b6baf30') },
     { key: 'hdp', title: 'Studio Headphones', sku: 'HC-HDP-02', price: 189, stock: 24, img: IMG('1505740420928-5e560c06d30e') },
@@ -47,7 +40,7 @@
 
   /* ---------------------------------------------------------------- state */
   let S;
-  const UI = { shopView: 'customers', sfView: 'contacts', form: {}, inv: new Map(), sfEdit: null, sfMenu: null };
+  const UI = { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null };
 
   function freshState() {
     const s = {
@@ -70,13 +63,12 @@
       o.fulfillment = ful;
       c.orders++;
       s.shop.orders.unshift(o);
-      const so = createSfOrder(s, o);
-      so.Status = ful === 'Fulfilled' ? 'Fulfilled' : 'Paid';
+      createSfOrder(s, o).Status = ful === 'Fulfilled' ? 'Fulfilled' : 'Paid';
     });
     return s;
   }
   function makeCustomer(p, at = Date.now()) {
-    return { id: shopId(), first: p.first, last: p.last, email: p.email || `${p.first}.${p.last}@example.com`.toLowerCase(),
+    return { id: shopId(), first: p.first, last: p.last, email: p.email || `${p.first}.${p.last}@example.com`.toLowerCase().replace(/\s+/g, ''),
              phone: p.phone || phone(), city: `${p.city}${p.state ? ' ' + p.state : ''}`, orders: 0, at };
   }
   function linkCustomer(s, c) {
@@ -90,211 +82,161 @@
              total: lines.reduce((t, l) => t + l.qty * l.price, 0), financial: 'Paid', fulfillment: 'Unfulfilled', at };
   }
   function createSfOrder(s, o) {
-    const so = { Id: sfId('801'), OrderNumber: String(s.sfOrderNo++).padStart(8, '0'), Account: o.customerName, Start: new Date(o.at).toLocaleDateString('en-AU'),
+    const so = { Id: sfId('801'), OrderNumber: String(s.sfOrderNo++).padStart(8, '0'), Account: o.customerName,
                  Status: 'Paid', Amount: o.total, Lines: o.lines.length, ShopifyId: o.id, ShopifyName: o.name };
     s.sf.orders.unshift(so);
     return so;
   }
 
-  /* ---------------------------------------------------------------- flashes */
-  const flashes = new Map();
-  const flash = (side, id) => flashes.set(side + ':' + id, performance.now());
-  function fl(side, id) {
-    const t = flashes.get(side + ':' + id);
-    if (t == null) return '';
-    const el = performance.now() - t;
-    if (el > 2400) { flashes.delete(side + ':' + id); return ''; }
-    return ` class="flash" style="--d:-${el | 0}ms"`;
+  /* ---------------------------------------------------------------- fresh-row marks */
+  const marks = new Map();
+  const mark = (side, id, note) => marks.set(side + ':' + id, { t: performance.now(), note });
+  function freshAttr(side, id) {
+    const m = marks.get(side + ':' + id);
+    if (!m) return '';
+    const el = performance.now() - m.t;
+    if (el > 2600) { marks.delete(side + ':' + id); return ''; }
+    return ` data-fresh="1" data-note="${esc(m.note)}" style="--d:-${el | 0}ms"`;
   }
+  const rowCls = (side, id) => 'row' + (marks.has(side + ':' + id) && performance.now() - marks.get(side + ':' + id).t < 2600 ? ' fresh' : '');
 
-  /* ---------------------------------------------------------------- Shopify UI */
-  const shopEl = $('#shop'), sfEl = $('#sf');
-
-  function shopDirtyMsg() {
-    if (UI.shopView === 'customerNew' && Object.values(UI.form).some(v => v && String(v).trim())) return 'Unsaved customer';
-    if (UI.inv.size) return 'Unsaved changes';
-    return '';
-  }
-  function renderShopTop() {
-    const msg = shopDirtyMsg();
-    const top = $('#sTop');
-    const want = msg ? 'save' : 'normal';
-    if (top.dataset.mode === want && want === 'normal') return;
-    top.dataset.mode = want;
-    top.innerHTML = msg
-      ? `<div class="s-savebar"><span class="s-sb-msg"><i data-lucide="circle-alert"></i>${msg}</span>
-           <div class="s-sb-btns"><button class="s-btn-dark" data-act="shopDiscard" data-q="shop-discard">Discard</button><button class="s-btn-light" data-act="shopSave" data-q="shop-save">Save</button></div></div>`
-      : `<span class="s-logo"><span class="logo logo-shopify"></span></span>
-         <div class="s-search" data-na><i data-lucide="search"></i>Search<kbd>Ctrl K</kbd></div>
-         <div class="s-store" data-na><span class="s-av">HC</span>Harbour &amp; Co.</div>`;
-    icons();
-  }
-
-  function renderShopMain() {
-    const v = UI.shopView, sh = S.shop;
-    let h = '';
-    if (v === 'customers') {
-      h = `<div class="s-head"><h1>Customers</h1><button class="s-btn-primary" data-act="shopNewCustomer" data-q="shop-add-customer">Add customer</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Returning</span><span data-na>Email subscribers</span></div>
-        <table class="s-table"><thead><tr><th>Customer name</th><th>Phone</th><th>Location</th><th class="r">Orders</th></tr></thead><tbody>
-        ${sh.customers.map(c => `<tr data-name="${esc(c.first + ' ' + c.last)}"${fl('shop', c.id)}><td><b>${esc(c.first)} ${esc(c.last)}</b><div class="s-sub">${esc(c.email)}</div></td>
-          <td data-cell="phone">${esc(c.phone)}</td><td>${esc(c.city)}, Australia</td><td class="r">${c.orders} order${c.orders === 1 ? '' : 's'}</td></tr>`).join('')}
-        </tbody></table></div>`;
-    } else if (v === 'customerNew') {
-      const f = UI.form;
-      const field = (k, label, ph = '') => `<label class="s-field"><span>${label}</span><input data-f="${k}" data-q="f-${k}" value="${esc(f[k] || '')}" placeholder="${ph}" autocomplete="off"></label>`;
-      h = `<div class="s-head"><button class="s-back" data-act="shopBack" data-q="shop-back"><i data-lucide="arrow-left"></i></button><h1>New customer</h1></div>
-        <div class="s-card s-form"><h2>Customer overview</h2>
-          <div class="s-row2">${field('first', 'First name')}${field('last', 'Last name')}</div>
-          ${field('email', 'Email')}${field('phone', 'Phone number')}
-        </div>
-        <div class="s-card s-form"><h2>Default address</h2>
-          <div class="s-row2">${field('city', 'City')}${field('state', 'State/territory')}</div>
-          <label class="s-field"><span>Country/region</span><div class="s-select" data-na>Australia<i data-lucide="chevron-down"></i></div></label>
-        </div>`;
-    } else if (v === 'orders') {
-      const badge = (cls, t) => `<span class="badge ${cls}"><i></i>${t}</span>`;
-      h = `<div class="s-head"><h1>Orders</h1><button class="s-btn-sec" style="margin-left:auto" data-na>Export</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Unfulfilled</span><span data-na>Unpaid</span><span data-na>Open</span></div>
-        <table class="s-table"><thead><tr><th>Order</th><th class="c-date">Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th></tr></thead><tbody>
-        ${sh.orders.map(o => `<tr data-order="${o.name}"${fl('shop', o.id)}><td><b>${o.name}</b></td><td class="c-date">${timeAgo(o.at)}</td><td>${esc(o.customerName)}</td><td class="r">${money(o.total)}</td>
-          <td>${o.financial === 'Refunded' ? badge('ref', 'Refunded') : o.financial === 'Cancelled' ? badge('can', 'Voided') : badge('paid', 'Paid')}</td>
-          <td>${o.fulfillment === 'Fulfilled' ? badge('ful', 'Fulfilled') : o.fulfillment === 'Cancelled' ? badge('can', 'Cancelled') : badge('unf', 'Unfulfilled')}</td></tr>`).join('')}
-        </tbody></table></div>`;
-    } else {
-      h = `<div class="s-head"><h1>Inventory</h1><button class="s-btn-sec" style="margin-left:auto" data-na>Export</button></div>
-        <div class="s-card"><div class="s-tabs"><span class="on">All</span><span data-na>Harbour &amp; Co. Warehouse</span></div>
-        <table class="s-table"><thead><tr><th>Product</th><th>SKU</th><th class="r">Price</th><th class="r">Available</th></tr></thead><tbody>
-        ${sh.products.map(p => { const dv = UI.inv.get(p.id); return `<tr data-sku="${p.sku}"${fl('shop', p.id)}><td><span class="s-prod"><img class="s-thumb" src="${p.img}" alt="">${esc(p.title)}</span></td><td>${p.sku}</td><td class="r">${money(p.price)}</td>
-          <td class="r"><input class="s-num${dv != null ? ' dirty' : ''}" type="text" inputmode="numeric" data-inv="${p.id}" data-q="inv-${p.sku}" value="${dv != null ? esc(dv) : p.stock}"></td></tr>`; }).join('')}
-        </tbody></table></div>`;
-    }
-    keepFocus($('#sMain'), h);
-    shopEl.querySelectorAll('.s-nav a[data-sv]').forEach(a => a.classList.toggle('on',
-      (a.dataset.sv === UI.shopView || (UI.shopView === 'customerNew' && a.dataset.sv === 'customers')) && !(a.dataset.sv === 'inventory' && !a.classList.contains('sub') && UI.shopView === 'inventory')));
-    $('#sOrdCnt').textContent = S.shop.orders.filter(o => o.fulfillment === 'Unfulfilled').length || '';
-  }
-
-  // re-render without losing the caret in an input the user is typing in
+  /* ---------------------------------------------------------------- rendering */
   function keepFocus(container, html) {
     const a = document.activeElement;
     let key = null, sel = null;
-    if (a && container.contains(a) && a.tagName === 'INPUT') { key = a.dataset.q; sel = [a.selectionStart, a.selectionEnd]; }
+    if (a && container.contains(a) && a.tagName === 'INPUT') { key = a.dataset.k; sel = [a.selectionStart, a.selectionEnd]; }
     const top = container.scrollTop;
     container.innerHTML = html;
     container.scrollTop = top;
-    if (key) { const n = container.querySelector(`[data-q="${key}"]`); if (n) { n.focus(); try { n.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
-    icons();
+    if (key) { const n = container.querySelector(`[data-k="${key}"]`); if (n) { n.focus(); try { n.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
+  }
+  const editing = (side, kind, id) => UI.edit && UI.edit.side === side && UI.edit.kind === kind && UI.edit.id === id;
+  const editBox = () => `<span class="inline-edit"><input data-k="edit" data-edit value="${esc(UI.edit.value)}" autocomplete="off"><button class="pill solid" data-act="editSave" style="height:28px">Save</button><button class="txt" data-act="editCancel">Cancel</button></span>`;
+
+  function tabs(el, list, cur, attr) {
+    el.innerHTML = list.map(([k, label, n]) => `<button data-${attr}="${k}" class="${k === cur ? 'on' : ''}">${label}<sup>${n}</sup></button>`).join('');
   }
 
-  let sToastT;
-  function shopToast(msg) {
-    const t = $('#sToast'); t.textContent = msg; t.classList.add('show');
-    clearTimeout(sToastT); sToastT = setTimeout(() => t.classList.remove('show'), 2600);
-  }
-
-  /* ---------------------------------------------------------------- Salesforce UI */
-  function renderSf() {
-    const v = UI.sfView, sf = S.sf, ed = UI.sfEdit;
-    const editCell = (obj, rec, field, val, q) => {
-      if (ed && ed.obj === obj && ed.id === rec.Id && ed.field === field) {
-        return `<td class="sf-ed${ed.changed ? ' edited' : ''}"><input class="sf-in" data-sfin data-q="sf-in" value="${esc(ed.value)}"></td>`;
-      }
-      const changed = ed && ed.saved && ed.obj === obj && ed.id === rec.Id;
-      return `<td class="sf-ed${changed ? ' edited' : ''}">${esc(val)}<button class="sf-pen" title="Edit ${field}" data-act="sfEditStart" data-obj="${obj}" data-id="${rec.Id}" data-field="${field}" data-q="${q}"><span class="slds ic-edit"></span></button></td>`;
-    };
+  function renderShop() {
+    const sh = S.shop, t = UI.shopTab;
+    tabs($('#shopTabs'), [['customers', 'Customers', sh.customers.length], ['orders', 'Orders', sh.orders.length], ['stock', 'Stock', sh.products.length]], t, 'st');
     let h = '';
-    const head = (icon, color, obj, lv, n, btns = '<button class="sf-btn" data-na>New</button><button class="sf-btn" data-na>Import</button>') => `
-      <div class="sf-lvh"><span class="sf-oicon" style="--c:${color}"><span class="slds ${icon}"></span></span>
-        <div><div class="sf-obj">${obj}</div><div class="sf-lv" data-na>${lv}<span class="slds ic-down"></span></div></div>
-        <div class="sf-btns">${btns}</div></div>
-      <div class="sf-info">${n} item${n === 1 ? '' : 's'} &bull; Sorted by ${v === 'orders' ? 'Order Number' : 'Name'} &bull; Updated a few seconds ago</div>`;
-    if (v === 'contacts') {
-      h = head('ic-contact', '#A094ED', 'Contacts', 'All Contacts', sf.contacts.length) + `
-        <table class="sf-table"><thead><tr><th class="num"></th><th>Name</th><th>Account Name</th><th>Phone</th><th>Email</th><th>Shopify ID</th></tr></thead><tbody>
-        ${sf.contacts.map((c, i) => `<tr data-name="${esc(c.FirstName + ' ' + c.LastName)}"${fl('sf', c.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${esc(c.FirstName)} ${esc(c.LastName)}</span></td>
-          <td><span class="sf-link" data-na>${esc(c.Account)}</span></td>${editCell('contact', c, 'Phone', c.Phone, 'sf-pen-phone-' + c.FirstName)}<td>${esc(c.Email)}</td><td class="sf-mono">${c.ShopifyId}</td></tr>`).join('')}
-        </tbody></table>`;
-    } else if (v === 'orders') {
-      h = head('ic-orders', '#769ED9', 'Orders', 'All Orders', sf.orders.length, '<button class="sf-btn solo" data-na>New</button>') + `
-        <table class="sf-table"><thead><tr><th class="num"></th><th>Order Number</th><th>Account Name</th><th>Order Start Date</th><th>Status</th><th class="r">Order Amount</th><th>Shopify Order</th><th></th></tr></thead><tbody>
-        ${sf.orders.map((o, i) => `<tr data-order="${o.ShopifyName}"${fl('sf', o.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${o.OrderNumber}</span></td><td><span class="sf-link" data-na>${esc(o.Account)}</span></td>
-          <td>${o.Start}</td><td>${o.Status}</td><td class="r">${money(o.Amount)}</td><td class="sf-mono">${o.ShopifyName}</td>
-          <td style="width:40px"><button class="sf-rowact" data-act="sfMenu" data-id="${o.Id}" data-q="sf-rowact-${o.ShopifyName.slice(1)}"><span class="slds ic-down"></span></button>
-          ${UI.sfMenu === o.Id ? `<div class="sf-menu"><a data-act="sfStatus" data-id="${o.Id}" data-status="Fulfilled" data-q="sf-mark-fulfilled">Mark as Fulfilled</a><a data-act="sfStatus" data-id="${o.Id}" data-status="Refunded">Mark as Refunded</a><a data-act="sfStatus" data-id="${o.Id}" data-status="Cancelled">Cancel Order</a></div>` : ''}</td></tr>`).join('')}
-        </tbody></table>`;
+    if (t === 'customers') {
+      if (UI.form) {
+        const f = UI.form;
+        const fld = (k, label, wide) => `<label class="${wide ? 'wide' : ''}">${label}<input data-k="f-${k}" data-f="${k}" value="${esc(f[k] || '')}" autocomplete="off"></label>`;
+        h += `<div class="addform">${fld('first', 'First name')}${fld('last', 'Last name')}${fld('email', 'Email', true)}${fld('phone', 'Phone')}${fld('city', 'City')}
+          <div class="actions"><button class="pill solid" data-act="formSave">Save customer</button><button class="txt" data-act="formCancel">Cancel</button>${UI.formErr ? `<span class="err">${esc(UI.formErr)}</span>` : ''}</div></div>`;
+      } else {
+        h += `<div class="lead-act"><button class="pill" data-act="formOpen">Add a customer</button><span class="note">It shows up in Salesforce as a Contact.</span></div>`;
+      }
+      h += '<ul class="rows">' + sh.customers.map(c => `
+        <li class="${rowCls('shop', c.id)}"${freshAttr('shop', c.id)}>
+          <div class="r-main"><span class="r-name">${esc(c.first)} ${esc(c.last)}</span><span class="r-meta">${esc(c.email)} &middot; ${esc(c.city)}</span></div>
+          <div class="r-side">${editing('shop', 'phone', c.id) ? editBox() : `<span class="mono">${esc(c.phone)}</span><button class="txt" data-act="editStart" data-side="shop" data-kind="phone" data-id="${c.id}">Edit</button>`}</div>
+        </li>`).join('') + '</ul>';
+    } else if (t === 'orders') {
+      h += `<div class="lead-act"><button class="pill" data-act="storeOrder">Simulate a store order</button><span class="note">A shopper checks out online.</span></div>`;
+      h += '<ul class="rows">' + sh.orders.map(o => {
+        const items = o.lines.reduce((n, l) => n + l.qty, 0);
+        const ful = o.fulfillment === 'Unfulfilled' ? '<span class="warn">Unfulfilled</span>' : o.fulfillment === 'Cancelled' ? '<span class="bad">Cancelled</span>' : 'Fulfilled';
+        const fin = o.financial === 'Cancelled' ? 'Voided' : o.financial;
+        return `<li class="${rowCls('shop', o.id)}"${freshAttr('shop', o.id)}>
+          <div class="r-main"><span class="r-name">${o.name} &middot; ${esc(o.customerName)}</span><span class="r-meta">${plural(items, 'item')} &middot; ${money(o.total)}</span></div>
+          <div class="r-side"><span class="status">${fin} &middot; ${ful}</span>${o.fulfillment === 'Unfulfilled' ? `<button class="txt" data-act="fulfil" data-id="${o.id}">Fulfil</button>` : ''}</div>
+        </li>`;
+      }).join('') + '</ul>';
     } else {
-      h = head('ic-product', '#B781D3', 'Products', 'All Products', sf.products.length) + `
-        <table class="sf-table"><thead><tr><th class="num"></th><th>Product Name</th><th>Product Code</th><th>Stock</th><th class="r">List Price</th></tr></thead><tbody>
-        ${sf.products.map((p, i) => `<tr data-sku="${p.ProductCode}"${fl('sf', p.Id)}><td class="num">${i + 1}</td><td><span class="sf-link" data-na>${esc(p.Name)}</span></td><td>${p.ProductCode}</td>
-          ${editCell('product', p, 'Stock', p.Stock, 'sf-pen-stock-' + p.ProductCode)}<td class="r">${money(p.UnitPrice)}</td></tr>`).join('')}
-        </tbody></table>`;
+      h += '<ul class="rows">' + sh.products.map(p => `
+        <li class="${rowCls('shop', p.id)}"${freshAttr('shop', p.id)}>
+          <img class="thumb" src="${p.img}" alt="">
+          <div class="r-main"><span class="r-name">${esc(p.title)}</span><span class="r-meta">${p.sku} &middot; ${money(p.price)}</span></div>
+          <div class="r-side stepper"><button data-act="shopStock" data-id="${p.id}" data-d="-1" aria-label="One less">&minus;</button><span class="q">${p.stock}</span><button data-act="shopStock" data-id="${p.id}" data-d="1" aria-label="One more">+</button></div>
+        </li>`).join('') + '</ul>';
     }
-    if (ed && !ed.saved) h += `<div class="sf-foot"><button class="sf-btn solo" data-act="sfCancel">Cancel</button><button class="sf-btn solo brand" data-act="sfSave" data-q="sf-save">Save</button></div>`;
-    keepFocus($('#sfPage'), `<div class="sf-card">${h}</div>`);
-    sfEl.querySelectorAll('.sf-nav a[data-fv]').forEach(a => a.classList.toggle('on', a.dataset.fv === UI.sfView));
-    sfEl.classList.toggle('down', S.eng.sfDown);
+    keepFocus($('#shopBody'), h);
   }
 
-  let fToastT;
-  function sfToast(msg, info) {
-    const t = $('#sfToast'); t.innerHTML = `<i data-lucide="${info ? 'info' : 'circle-check'}"></i>${esc(msg)}`; icons();
-    t.classList.toggle('info', !!info); t.classList.add('show');
-    clearTimeout(fToastT); fToastT = setTimeout(() => t.classList.remove('show'), 2600);
+  function renderSf() {
+    const sf = S.sf, t = UI.sfTab;
+    tabs($('#sfTabs'), [['contacts', 'Contacts', sf.contacts.length], ['orders', 'Orders', sf.orders.length], ['products', 'Products', sf.products.length]], t, 'ft');
+    let h = '<ul class="rows">';
+    if (t === 'contacts') {
+      h += sf.contacts.map(c => `
+        <li class="${rowCls('sf', c.Id)}"${freshAttr('sf', c.Id)}>
+          <div class="r-main"><span class="r-name">${esc(c.FirstName)} ${esc(c.LastName)}</span><span class="r-meta">Shopify ID ${c.ShopifyId} &middot; ${esc(c.Email)}</span></div>
+          <div class="r-side">${editing('sf', 'phone', c.Id) ? editBox() : `<span class="mono">${esc(c.Phone)}</span><button class="txt" data-act="editStart" data-side="sf" data-kind="phone" data-id="${c.Id}">Edit</button>`}</div>
+        </li>`).join('');
+    } else if (t === 'orders') {
+      h += sf.orders.map(o => `
+        <li class="${rowCls('sf', o.Id)}"${freshAttr('sf', o.Id)}>
+          <div class="r-main"><span class="r-name">${o.OrderNumber} &middot; ${esc(o.Account)}</span><span class="r-meta">${plural(o.Lines, 'order product')} &middot; ${money(o.Amount)} &middot; Shopify ${o.ShopifyName}</span></div>
+          <div class="r-side"><select class="sel" data-status="${o.Id}" aria-label="Order status">${['Paid', 'Fulfilled', 'Refunded', 'Cancelled'].map(s => `<option${s === o.Status ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+        </li>`).join('');
+    } else {
+      h += sf.products.map(p => `
+        <li class="${rowCls('sf', p.Id)}"${freshAttr('sf', p.Id)}>
+          <div class="r-main"><span class="r-name">${esc(p.Name)}</span><span class="r-meta">${p.ProductCode} &middot; ${money(p.UnitPrice)}</span></div>
+          <div class="r-side stepper"><button data-act="sfStock" data-id="${p.Id}" data-d="-1" aria-label="One less">&minus;</button><span class="q">${p.Stock}</span><button data-act="sfStock" data-id="${p.Id}" data-d="1" aria-label="One more">+</button></div>
+        </li>`).join('');
+    }
+    keepFocus($('#sfBody'), h + '</ul>');
+    $('#sf').classList.toggle('offline', S.eng.sfDown);
+    const b = $('#btnOutage');
+    b.textContent = S.eng.sfDown ? 'Bring Salesforce back' : 'Take Salesforce offline';
+    b.classList.toggle('alarm', S.eng.sfDown);
   }
 
-  function renderStats() {
+  function renderTally() {
     const m = S.eng.m;
-    const avg = m.lat.length ? (m.lat.reduce((a, b) => a + b, 0) / m.lat.length).toFixed(1) + 's' : '-';
-    $('#stats').textContent = `${m.events} events · ${m.synced} synced · avg ${avg} · ${m.dupes} duplicate${m.dupes === 1 ? '' : 's'} ignored · ${m.loops} echo${m.loops === 1 ? '' : 'es'} skipped · ${m.recovered} recovered after retry`;
+    const avg = m.lat.length ? (m.lat.reduce((a, b) => a + b, 0) / m.lat.length).toFixed(1) : null;
+    const first = m.events ? `${plural(m.events, 'event')}, ${m.synced} synced${avg ? `, ${avg}s on average` : ''}.` : 'Nothing has happened yet.';
+    $('#tally').innerHTML = `${first}<small>${m.dupes} duplicate${m.dupes === 1 ? '' : 's'} ignored &middot; ${m.loops} echo${m.loops === 1 ? '' : 'es'} skipped &middot; ${m.recovered} recovered after retry</small>`;
+    $('#btnResend').disabled = !S.eng.lastWebhook;
   }
 
-  function render() { renderShopTop(); renderShopMain(); renderSf(); renderStats(); }
+  function render() { renderShop(); renderSf(); renderTally(); }
 
   /* ---------------------------------------------------------------- sync log */
-  const logBody = $('#logBody');
-  const RES = { run: 'processing', ok: 'synced', dup: 'duplicate ignored', loop: 'echo skipped', retry: 'waiting to retry', recovered: 'synced after retry', fail: 'failed, kept in error log' };
-  const DIR = {
-    s2f: '<span class="logo logo-shopify"></span>Shopify<em>→</em><span class="logo logo-sf"></span>Salesforce',
-    f2s: '<span class="logo logo-sf"></span>Salesforce<em>→</em><span class="logo logo-shopify"></span>Shopify',
-  };
-  function emptyLog() { logBody.innerHTML = '<div class="log-empty">No events yet. Change something in Shopify or Salesforce and it shows up here.</div>'; }
+  const entries = $('#entries');
+  const RES = { run: 'working', ok: 'synced', dup: 'duplicate ignored', loop: 'echo skipped', retry: 'waiting to retry', recovered: 'synced after retry', fail: 'failed, kept in error log' };
+  const DIR = { s2f: 'Shopify &rarr; Salesforce', f2s: 'Salesforce &rarr; Shopify' };
+  function emptyLog() { entries.innerHTML = '<li class="empty">Make a change on either side and it will show up here.</li>'; }
+  function clearEmpty() { const e = entries.querySelector('.empty'); if (e) e.remove(); }
   function trace(dir, topic, ref) {
-    const e = logBody.querySelector('.log-empty'); if (e) e.remove();
-    logBody.querySelectorAll('.lg-item.open').forEach(n => { if (!n.classList.contains('keep')) n.classList.remove('open'); });
-    const el = document.createElement('div');
-    el.className = 'lg-item open';
-    el.innerHTML = `<div class="lg-row"><span class="mono">${clock()}</span><span class="c-dir">${DIR[dir]}</span><span class="mono c-evt">${esc(topic)}</span>
-      <span class="c-rec">${esc(ref || '')}</span><span class="c-res run"><span class="d"></span>${RES.run}</span><span class="mono r c-took">-</span></div><div class="lg-steps"></div>`;
-    logBody.prepend(el);
-    while (logBody.children.length > 60) logBody.lastElementChild.remove();
-    logBody.scrollTop = 0;
+    clearEmpty();
+    entries.querySelectorAll('.ev.open:not(.keep)').forEach(n => n.classList.remove('open'));
+    const el = document.createElement('li');
+    el.className = 'ev run open';
+    el.innerHTML = `<div class="ev-top"><span>${clock()}</span><span class="dir">${DIR[dir]}</span><span class="res">${RES.run}</span></div>
+      <div class="ev-what"><code>${esc(topic)}</code><span>${esc(ref || '')}</span></div><ol class="ev-steps"></ol>`;
+    entries.prepend(el);
+    while (entries.children.length > 60) entries.lastElementChild.remove();
+    entries.scrollTop = 0;
     const t0 = performance.now();
     return {
       t0, el,
       step(text, detail, kind) {
-        const d = document.createElement('div');
-        if (kind) d.className = kind;
-        d.innerHTML = `<span class="ms">+${Math.round(performance.now() - t0)}ms</span><span class="tx">${esc(text)}</span>${detail ? `<span class="dt">${esc(detail)}</span>` : ''}`;
-        el.querySelector('.lg-steps').append(d);
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="t">+${Math.round(performance.now() - t0)}ms</span><span class="${kind || ''}">${esc(text)}${detail ? ` <span class="d">${esc(detail)}</span>` : ''}</span>`;
+        el.querySelector('.ev-steps').append(li);
       },
       status(kind, took) {
-        const r = el.querySelector('.c-res');
-        r.className = 'c-res ' + kind;
-        r.innerHTML = `<span class="d"></span>${RES[kind]}`;
-        if (took != null) el.querySelector('.c-took').textContent = took;
+        el.classList.remove('run', 'ok', 'dup', 'loop', 'retry', 'recovered', 'fail');
+        el.classList.add(kind);
+        el.querySelector('.res').textContent = RES[kind] + (took ? ' · ' + took : '');
       },
     };
   }
   function sysLine(text, up) {
-    const e = logBody.querySelector('.log-empty'); if (e) e.remove();
-    const el = document.createElement('div');
-    el.className = 'lg-sys ' + (up ? 'up' : 'down');
+    clearEmpty();
+    const el = document.createElement('li');
+    el.className = 'sysline ' + (up ? 'up' : 'down');
     el.textContent = `${clock()}  ${text}`;
-    logBody.prepend(el);
-    logBody.scrollTop = 0;
+    entries.prepend(el);
+    entries.scrollTop = 0;
   }
-  logBody.addEventListener('click', e => { const r = e.target.closest('.lg-row'); if (r) r.parentElement.classList.toggle('open'); });
+  entries.addEventListener('click', e => { const ev = e.target.closest('.ev'); if (ev) ev.classList.toggle('open'); });
   async function step(T, text, detail, ms, kind) { T.step(text, detail, kind); await sleep(ms); }
 
   /* ---------------------------------------------------------------- engine */
@@ -317,6 +259,7 @@
     if (!echo && !side) S.eng.lastWebhook = wh;
     const go = () => enqueue({ kind: 'webhook', wh });
     delay ? later(delay, go) : go();
+    renderTally();
   }
   const emitCdc = (entity, recordId, fields, ref) => enqueue({ kind: 'cdc', ev: { entity, recordId, fields, ref, user: SF_USER } });
 
@@ -329,32 +272,32 @@
   async function onWebhook(wh) {
     const E = S.eng;
     const T = trace('s2f', wh.topic, wh.ref);
-    E.m.events++; renderStats();
+    E.m.events++; renderTally();
     await step(T, 'Webhook received', 'id ' + wh.id.slice(0, 8), 340);
     await step(T, 'Signature checked', 'HMAC-SHA256 ok', 200);
     if (E.processed.has(wh.id)) {
-      await step(T, 'Event id already processed, nothing written', null, 150, 'warn');
-      T.status('dup', Math.round(performance.now() - T.t0) + 'ms'); E.m.dupes++; renderStats();
+      await step(T, 'Already processed, nothing written', null, 150, 'warn');
+      T.status('dup', Math.round(performance.now() - T.t0) + 'ms'); E.m.dupes++; renderTally();
       return;
     }
     E.processed.add(wh.id);
     if (isEcho(wh)) {
-      await step(T, 'Values match what the sync just wrote to Shopify, skipped (no loop)', null, 150, 'loop');
-      T.status('loop', Math.round(performance.now() - T.t0) + 'ms'); E.m.loops++; renderStats();
+      await step(T, 'Same values the sync just wrote to Shopify, skipped so it cannot loop', null, 150, 'loop');
+      T.status('loop', Math.round(performance.now() - T.t0) + 'ms'); E.m.loops++; renderTally();
       return;
     }
     const plan = mapShopify(wh);
     await step(T, plan.map, plan.detail, 260);
     await sleep(380);
     if (E.sfDown) {
-      T.step('Salesforce API not reachable', 'HTTP 503', 'err');
+      T.step('Salesforce not reachable', 'HTTP 503', 'err');
       queueRetry(T, plan, 1);
       return;
     }
     const r = applySf(plan);
     T.step(r.text, r.detail, 'good');
     const secs = (performance.now() - T.t0) / 1000;
-    E.m.synced++; E.m.lat.push(secs); renderStats();
+    E.m.synced++; E.m.lat.push(secs); renderTally();
     T.status('ok', secs.toFixed(1) + 's');
   }
 
@@ -373,20 +316,20 @@
   function mapShopify(wh) {
     const p = wh.payload;
     if (wh.topic.startsWith('customers/')) return {
-      map: 'Mapped to Contact', detail: 'FirstName, LastName, Email, Phone, MailingCity',
+      map: 'Mapped to Contact', detail: 'name, email, phone, city',
       apply() {
         let ct = S.sf.contacts.find(x => x.ShopifyId === p.id);
-        if (ct && ct.srcAt > p.updatedAt) return { text: 'Salesforce already has newer data, skipped', detail: 'out-of-order safe', id: ct.Id, view: 'contacts' };
+        if (ct && ct.srcAt > p.updatedAt) return { text: 'Salesforce already has newer data, skipped', detail: 'out-of-order safe', id: ct.Id, tab: 'contacts', note: 'checked' };
         if (!ct) {
           ct = linkCustomer(S, { ...(S.shop.customers.find(x => x.id === p.id) || p), at: p.updatedAt });
-          return { text: 'Contact created, upsert on Shopify_Customer_Id__c', detail: ct.Id, id: ct.Id, view: 'contacts' };
+          return { text: 'Contact created, matched on Shopify ID', detail: ct.Id, id: ct.Id, tab: 'contacts', note: 'new from Shopify' };
         }
         Object.assign(ct, { FirstName: p.first, LastName: p.last, Email: p.email, Phone: p.phone, srcAt: p.updatedAt });
-        return { text: 'Contact updated, upsert on Shopify_Customer_Id__c', detail: ct.Id, id: ct.Id, view: 'contacts' };
+        return { text: 'Contact updated, matched on Shopify ID', detail: ct.Id, id: ct.Id, tab: 'contacts', note: 'updated from Shopify' };
       },
     };
     if (wh.topic === 'orders/create') return {
-      map: 'Mapped to Order + Order Products', detail: `${p.lines.length} line${p.lines.length === 1 ? '' : 's'}, Standard Price Book`,
+      map: 'Mapped to Order and Order Products', detail: plural(p.lines.length, 'line'),
       apply() {
         const extra = [];
         if (!S.sf.contacts.find(x => x.ShopifyId === p.customerId)) {
@@ -394,38 +337,38 @@
           if (c) { linkCustomer(S, c); extra.push('customer created first'); }
         }
         const so = S.sf.orders.find(x => x.ShopifyId === p.id) || createSfOrder(S, p);
-        return { text: `Order ${so.OrderNumber} created with ${p.lines.length} Order Product${p.lines.length === 1 ? '' : 's'}`, detail: extra.join(', ') || so.Id, id: so.Id, view: 'orders' };
+        return { text: `Order ${so.OrderNumber} created with ${plural(p.lines.length, 'order product')}`, detail: extra.join(', ') || so.Id, id: so.Id, tab: 'orders', note: 'new from Shopify' };
       },
     };
     if (wh.topic.startsWith('orders/')) {
       const st = p.fulfillment === 'Fulfilled' ? 'Fulfilled' : p.fulfillment === 'Cancelled' ? 'Cancelled' : p.financial === 'Refunded' ? 'Refunded' : 'Paid';
       return {
-        map: 'Mapped to Order.Status', detail: `${p.fulfillment} -> ${st}`,
-        apply() { const so = S.sf.orders.find(x => x.ShopifyId === p.id); so.Status = st; return { text: `Order ${so.OrderNumber} status set to ${st}`, detail: so.Id, id: so.Id, view: 'orders' }; },
+        map: 'Mapped to Order Status', detail: `${p.fulfillment} -> ${st}`,
+        apply() { const so = S.sf.orders.find(x => x.ShopifyId === p.id); so.Status = st; return { text: `Order ${so.OrderNumber} set to ${st}`, detail: so.Id, id: so.Id, tab: 'orders', note: 'updated from Shopify' }; },
       };
     }
     return {
-      map: 'Mapped to Product2.Stock__c', detail: `${p.sku} = ${p.available}`,
+      map: 'Mapped to Product stock', detail: `${p.sku} = ${p.available}`,
       apply() {
         const fp = S.sf.products.find(x => x.ShopifyId === p.productId);
-        if (fp.srcAt > p.updatedAt) return { text: 'Salesforce already has newer stock, skipped', detail: 'out-of-order safe', id: fp.Id, view: 'products' };
+        if (fp.srcAt > p.updatedAt) return { text: 'Salesforce already has newer stock, skipped', detail: 'out-of-order safe', id: fp.Id, tab: 'products', note: 'checked' };
         fp.Stock = p.available; fp.srcAt = p.updatedAt;
-        return { text: `Product stock set to ${p.available}`, detail: fp.Id, id: fp.Id, view: 'products' };
+        return { text: `Stock set to ${p.available}`, detail: fp.Id, id: fp.Id, tab: 'products', note: 'updated from Shopify' };
       },
     };
   }
 
   function applySf(plan) {
     const r = plan.apply();
-    flash('sf', r.id);
-    if (!EMBED && !UI.sfEdit && UI.sfView !== r.view) UI.sfView = r.view;
+    mark('sf', r.id, r.note);
+    if (!UI.edit && UI.sfTab !== r.tab) UI.sfTab = r.tab;
     renderSf();
     return r;
   }
 
   function queueRetry(T, plan, n) {
     const d = BACKOFF[n - 1];
-    T.step(`Queued, retry ${n} of ${BACKOFF.length} in ${d / 1000}s`, n === 1 ? '(sped up for the demo, live: 1m, 5m, 30m, then hourly)' : null, 'warn');
+    T.step(`Queued, retry ${n} of ${BACKOFF.length} in ${d / 1000}s`, n === 1 ? '(sped up here, live: 1m, 5m, 30m, then hourly)' : null, 'warn');
     T.status('retry');
     T.el.classList.add('open', 'keep');
     RQ.push({ T, plan, n, at: Date.now() + d });
@@ -443,9 +386,9 @@
         return;
       }
       const r = applySf(it.plan);
-      it.T.step(`Retry ${it.n} succeeded`, null, 'good');
+      it.T.step(`Retry ${it.n} went through`, null, 'good');
       it.T.step(r.text, r.detail, 'good');
-      S.eng.m.synced++; S.eng.m.recovered++; renderStats();
+      S.eng.m.synced++; S.eng.m.recovered++; renderTally();
       it.T.status('recovered', ((performance.now() - it.T.t0) / 1000).toFixed(1) + 's');
     });
   }, 200);
@@ -454,19 +397,19 @@
   async function onCdc(ev) {
     const E = S.eng;
     const T = trace('f2s', ev.entity + 'ChangeEvent', ev.ref);
-    E.m.events++; renderStats();
+    E.m.events++; renderTally();
     await step(T, 'Change event received', 'Change Data Capture', 340);
-    await step(T, `Changed by ${ev.user}, not the integration user`, null, 200);
+    await step(T, `Changed by ${ev.user}, not by the sync`, null, 200);
     const plan = mapSalesforce(ev);
     await step(T, plan.map, plan.detail, 260);
     await sleep(380);
     const r = plan.apply();
-    flash('shop', r.id);
-    if (!EMBED && UI.shopView !== r.view && !shopDirtyMsg()) UI.shopView = r.view;
-    renderShopMain();
+    mark('shop', r.id, 'updated from Salesforce');
+    if (!UI.edit && !UI.form && UI.shopTab !== r.tab) UI.shopTab = r.tab;
+    renderShop();
     T.step(r.text, r.detail, 'good');
     const secs = (performance.now() - T.t0) / 1000;
-    E.m.synced++; E.m.lat.push(secs); renderStats();
+    E.m.synced++; E.m.lat.push(secs); renderTally();
     T.status('ok', secs.toFixed(1) + 's');
   }
 
@@ -481,11 +424,11 @@
         const p = custPayload(c);
         remember('c:' + c.id, custHash(p));
         emitWebhook('customers/update', p, `${c.first} ${c.last}`, { echo: true, delay: 650 });
-        return { text: 'Shopify customer updated', detail: 'customerUpdate ' + c.id, id: c.id, view: 'customers' };
+        return { text: 'Shopify customer updated', detail: 'customerUpdate', id: c.id, tab: 'customers' };
       },
     };
     if (ev.entity === 'Order') {
-      const how = { Fulfilled: 'fulfillmentCreate', Cancelled: 'orderCancel', Refunded: 'tagsAdd Refunded', Paid: 'tagsAdd Paid' }[f.Status];
+      const how = { Fulfilled: 'fulfillmentCreate', Cancelled: 'orderCancel', Refunded: 'tag added: Refunded', Paid: 'tag added: Paid' }[f.Status];
       return {
         map: 'Mapped Status to Shopify', detail: `${f.Status} -> ${how}`,
         apply() {
@@ -494,59 +437,75 @@
           if (f.Status === 'Fulfilled') o.fulfillment = 'Fulfilled';
           else if (f.Status === 'Cancelled') { o.fulfillment = 'Cancelled'; o.financial = 'Cancelled'; }
           else if (f.Status === 'Refunded') o.financial = 'Refunded';
+          else if (f.Status === 'Paid') o.financial = 'Paid';
           remember('o:' + o.id, o.fulfillment + '|' + o.financial);
           emitWebhook(f.Status === 'Fulfilled' ? 'orders/fulfilled' : f.Status === 'Cancelled' ? 'orders/cancelled' : 'orders/updated', orderPayload(o), o.name, { echo: true, delay: 650 });
-          return { text: `Shopify order ${o.name} marked ${f.Status.toLowerCase()}`, detail: how, id: o.id, view: 'orders' };
+          return { text: `Shopify order ${o.name} marked ${f.Status.toLowerCase()}`, detail: how, id: o.id, tab: 'orders' };
         },
       };
     }
     return {
-      map: 'Mapped to Shopify inventory', detail: `${f.ProductCode} available = ${f.Stock}`,
+      map: 'Mapped to Shopify stock', detail: `${f.ProductCode} = ${f.Stock}`,
       apply() {
         const fp = S.sf.products.find(x => x.Id === ev.recordId);
         const p = S.shop.products.find(x => x.id === fp.ShopifyId);
         p.stock = f.Stock;
-        UI.inv.delete(p.id);
         remember('i:' + p.id, String(p.stock));
         emitWebhook('inventory_levels/update', stockPayload(p), p.sku, { echo: true, delay: 650 });
-        return { text: `Shopify available set to ${p.stock}`, detail: 'inventorySetQuantities ' + p.sku, id: p.id, view: 'inventory' };
+        return { text: `Shopify stock set to ${p.stock}`, detail: 'inventorySetQuantities', id: p.id, tab: 'stock' };
       },
     };
   }
 
   /* ---------------------------------------------------------------- actions */
+  // stock steppers wait a moment so several quick clicks go out as one change
+  const stockTimers = new Map();
+  function debounceStock(key, fn) { clearTimeout(stockTimers.get(key)); stockTimers.set(key, setTimeout(() => { stockTimers.delete(key); fn(); }, 600)); }
+
   const A = {
-    shopView(v) { if (shopDirtyMsg()) return; UI.shopView = v; UI.form = {}; render(); },
-    sfView(v) { UI.sfView = v; UI.sfEdit = null; UI.sfMenu = null; renderSf(); },
-    shopNewCustomer() { UI.shopView = 'customerNew'; UI.form = {}; render(); },
-    shopBack() { UI.shopView = 'customers'; UI.form = {}; render(); },
-    shopDiscard() { UI.form = {}; UI.inv.clear(); if (UI.shopView === 'customerNew') UI.shopView = 'customers'; render(); },
-    shopSave() {
-      if (UI.shopView === 'customerNew') {
-        const f = UI.form;
-        if (!(f.first || '').trim() || !(f.last || '').trim()) { shopToast('First and last name are needed'); return; }
-        const c = makeCustomer({ first: f.first.trim(), last: f.last.trim(), email: (f.email || '').trim() || undefined, phone: (f.phone || '').trim() || undefined, city: (f.city || '').trim() || 'Sydney', state: (f.state || '').trim() });
-        S.shop.customers.unshift(c);
-        UI.form = {}; UI.shopView = 'customers';
-        flash('shop', c.id);
-        render();
-        shopToast('Customer created');
-        emitWebhook('customers/create', custPayload(c), `${c.first} ${c.last}`);
-        return;
+    formOpen() { UI.form = {}; UI.formErr = ''; UI.edit = null; renderShop(); const f = $('#shopBody [data-f="first"]'); if (f) f.focus(); },
+    formCancel() { UI.form = null; UI.formErr = ''; renderShop(); },
+    formSave() {
+      const f = UI.form || {};
+      const first = (f.first || '').trim(), last = (f.last || '').trim();
+      if (!first || !last) { UI.formErr = 'First and last name are needed.'; renderShop(); return; }
+      const email = (f.email || '').trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { UI.formErr = 'That email doesn’t look right.'; renderShop(); return; }
+      const c = makeCustomer({ first, last, email: email || undefined, phone: (f.phone || '').trim() || undefined, city: (f.city || '').trim() || 'Sydney', state: '' });
+      S.shop.customers.unshift(c);
+      UI.form = null; UI.formErr = '';
+      mark('shop', c.id, 'just added');
+      renderShop();
+      emitWebhook('customers/create', custPayload(c), `${c.first} ${c.last}`);
+    },
+    editStart(side, kind, id) {
+      if (side === 'sf' && S.eng.sfDown) return;
+      const rec = side === 'shop' ? S.shop.customers.find(x => x.id === id) : S.sf.contacts.find(x => x.Id === id);
+      UI.edit = { side, kind, id, value: side === 'shop' ? rec.phone : rec.Phone };
+      side === 'shop' ? renderShop() : renderSf();
+      const inp = $(`#${side === 'shop' ? 'shopBody' : 'sfBody'} [data-edit]`); if (inp) { inp.focus(); inp.select(); }
+    },
+    editCancel() { const s = UI.edit && UI.edit.side; UI.edit = null; s === 'sf' ? renderSf() : renderShop(); },
+    editSave() {
+      const ed = UI.edit; if (!ed) return;
+      const v = ed.value.trim();
+      UI.edit = null;
+      if (ed.side === 'shop') {
+        const c = S.shop.customers.find(x => x.id === ed.id);
+        if (!v || v === c.phone) return renderShop();
+        c.phone = v; c.at = Date.now();
+        mark('shop', c.id, 'edited');
+        renderShop();
+        emitWebhook('customers/update', custPayload(c), `${c.first} ${c.last}`);
+      } else {
+        if (S.eng.sfDown) return renderSf();
+        const ct = S.sf.contacts.find(x => x.Id === ed.id);
+        if (!v || v === ct.Phone) return renderSf();
+        ct.Phone = v; ct.srcAt = Date.now();
+        mark('sf', ct.Id, 'edited');
+        renderSf();
+        emitCdc('Contact', ct.Id, { Phone: v }, `${ct.FirstName} ${ct.LastName}`);
       }
-      const changes = [...UI.inv.entries()];
-      UI.inv.clear();
-      changes.forEach(([id, v]) => {
-        const p = S.shop.products.find(x => x.id === id);
-        const n = Math.max(0, parseInt(v, 10));
-        if (Number.isNaN(n) || n === p.stock) return;
-        const d = n - p.stock;
-        p.stock = n;
-        flash('shop', p.id);
-        emitWebhook('inventory_levels/update', stockPayload(p), `${p.sku} ${d > 0 ? '+' : ''}${d}`);
-      });
-      render();
-      if (changes.length) shopToast('Inventory updated');
     },
     storeOrder(first, items) {
       let c = first ? S.shop.customers.find(x => x.first === first) : null;
@@ -564,10 +523,9 @@
       const o = makeOrder(S, c, items);
       c.orders++;
       S.shop.orders.unshift(o);
-      flash('shop', o.id);
-      if (!EMBED && !shopDirtyMsg()) UI.shopView = 'orders';
-      render();
-      shopToast(`New order ${o.name} from Online Store`);
+      mark('shop', o.id, 'new order');
+      UI.shopTab = 'orders';
+      renderShop();
       emitWebhook('orders/create', orderPayload(o), `${o.name} ${c.first} ${c.last}`, { delay: 150 });
       o.lines.forEach((l, i) => {
         const p = S.shop.products.find(x => x.key === l.key);
@@ -575,179 +533,122 @@
         emitWebhook('inventory_levels/update', stockPayload(p), `${p.sku} -${l.qty} sold`, { side: true, delay: 300 + i * 80 });
       });
     },
-    sfEditStart(obj, id, field) {
+    fulfil(id) {
+      const o = S.shop.orders.find(x => x.id === id);
+      if (!o || o.fulfillment !== 'Unfulfilled') return;
+      o.fulfillment = 'Fulfilled';
+      mark('shop', o.id, 'fulfilled');
+      renderShop();
+      emitWebhook('orders/fulfilled', orderPayload(o), o.name);
+    },
+    shopStock(id, d) {
+      const p = S.shop.products.find(x => x.id === id);
+      const before = p._pending == null ? p.stock : p._pending;
+      p.stock = Math.max(0, p.stock + d);
+      if (p._pending == null) p._pending = before;
+      mark('shop', p.id, 'changed');
+      renderShop();
+      debounceStock('shop' + id, () => {
+        const diff = p.stock - p._pending; p._pending = null;
+        if (diff) emitWebhook('inventory_levels/update', stockPayload(p), `${p.sku} ${diff > 0 ? '+' : ''}${diff}`);
+      });
+    },
+    sfStock(id, d) {
       if (S.eng.sfDown) return;
-      const rec = (obj === 'contact' ? S.sf.contacts : S.sf.products).find(x => x.Id === id);
-      UI.sfEdit = { obj, id, field, value: String(rec[field]), orig: String(rec[field]), changed: false };
-      UI.sfMenu = null;
+      const fp = S.sf.products.find(x => x.Id === id);
+      const before = fp._pending == null ? fp.Stock : fp._pending;
+      fp.Stock = Math.max(0, fp.Stock + d); fp.srcAt = Date.now();
+      if (fp._pending == null) fp._pending = before;
+      mark('sf', fp.Id, 'changed');
       renderSf();
-      const inp = $('#sfPage .sf-in'); if (inp) { inp.focus(); inp.select(); }
+      debounceStock('sf' + id, () => {
+        const diff = fp.Stock - fp._pending; fp._pending = null;
+        if (diff) emitCdc('Product2', fp.Id, { Stock: fp.Stock, ProductCode: fp.ProductCode }, `${fp.ProductCode} ${diff > 0 ? '+' : ''}${diff}`);
+      });
     },
-    sfCancel() { UI.sfEdit = null; renderSf(); },
-    sfSave() {
-      const ed = UI.sfEdit;
-      if (!ed || S.eng.sfDown) return;
-      UI.sfEdit = null;
-      if (ed.value.trim() === ed.orig) { renderSf(); return; }
-      if (ed.obj === 'contact') {
-        const ct = S.sf.contacts.find(x => x.Id === ed.id);
-        ct.Phone = ed.value.trim(); ct.srcAt = Date.now();
-        flash('sf', ct.Id); renderSf();
-        sfToast(`Contact "${ct.FirstName} ${ct.LastName}" was saved.`);
-        emitCdc('Contact', ct.Id, { Phone: ct.Phone }, `${ct.FirstName} ${ct.LastName}`);
-      } else {
-        const fp = S.sf.products.find(x => x.Id === ed.id);
-        const n = Math.max(0, parseInt(ed.value, 10));
-        if (Number.isNaN(n)) { renderSf(); return; }
-        fp.Stock = n; fp.srcAt = Date.now();
-        flash('sf', fp.Id); renderSf();
-        sfToast(`Product "${fp.Name}" was saved.`);
-        emitCdc('Product2', fp.Id, { Stock: n, ProductCode: fp.ProductCode }, `${fp.ProductCode} stock ${n}`);
-      }
-    },
-    sfMenu(id) { UI.sfMenu = UI.sfMenu === id ? null : id; renderSf(); },
     sfStatus(id, status) {
-      UI.sfMenu = null;
       if (S.eng.sfDown) return renderSf();
       const so = S.sf.orders.find(x => x.Id === id);
-      if (so.Status === status) return renderSf();
+      if (so.Status === status) return;
       so.Status = status;
-      flash('sf', so.Id); renderSf();
-      sfToast(`Order "${so.OrderNumber}" was saved.`);
+      mark('sf', so.Id, 'edited');
+      renderSf();
       emitCdc('Order', so.Id, { Status: status }, `${so.OrderNumber} (${so.ShopifyName})`);
     },
     resend() {
       const wh = S.eng.lastWebhook;
       if (!wh) return;
-      enqueue({ kind: 'webhook', wh: { ...wh, ref: (wh.ref || '') + ' (resent)' } });
+      enqueue({ kind: 'webhook', wh: { ...wh, ref: (wh.ref || '') + ' (sent again)' } });
     },
     outage(on) {
       if (S.eng.sfDown === on) return;
       S.eng.sfDown = on;
-      $('#outage').checked = on;
-      UI.sfEdit = null; UI.sfMenu = null;
-      sysLine(on ? 'Salesforce API unreachable (simulated outage)' : 'Salesforce API reachable again', !on);
+      if (UI.edit && UI.edit.side === 'sf') UI.edit = null;
+      sysLine(on ? 'Salesforce went offline (simulated)' : 'Salesforce is back online', !on);
       renderSf();
     },
   };
 
   /* ---------------------------------------------------------------- events */
   document.addEventListener('click', e => {
-    const nav = e.target.closest('[data-sv]');
-    if (nav) { A.shopView(nav.dataset.sv); return; }
-    const fnav = e.target.closest('[data-fv]');
-    if (fnav) { A.sfView(fnav.dataset.fv); return; }
-    const na = e.target.closest('[data-na]');
-    if (na) {
-      if (na.closest('#sf')) sfToast('Not part of this demo. Try Contacts, Orders or Products.', true);
-      else shopToast('Not part of this demo. Try Customers, Orders or Inventory.');
-      return;
-    }
+    const st = e.target.closest('[data-st]');
+    if (st) { UI.shopTab = st.dataset.st; UI.edit = null; renderShop(); return; }
+    const ft = e.target.closest('[data-ft]');
+    if (ft) { UI.sfTab = ft.dataset.ft; UI.edit = null; renderSf(); return; }
     const b = e.target.closest('[data-act]');
-    if (!b) { if (UI.sfMenu && !e.target.closest('.sf-menu')) { UI.sfMenu = null; renderSf(); } return; }
+    if (!b) return;
     const d = b.dataset;
     switch (d.act) {
-      case 'shopNewCustomer': A.shopNewCustomer(); break;
-      case 'shopBack': A.shopBack(); break;
-      case 'shopSave': A.shopSave(); break;
-      case 'shopDiscard': A.shopDiscard(); break;
-      case 'sfEditStart': A.sfEditStart(d.obj, d.id, d.field); break;
-      case 'sfCancel': A.sfCancel(); break;
-      case 'sfSave': A.sfSave(); break;
-      case 'sfMenu': A.sfMenu(d.id); break;
-      case 'sfStatus': A.sfStatus(d.id, d.status); break;
+      case 'formOpen': A.formOpen(); break;
+      case 'formCancel': A.formCancel(); break;
+      case 'formSave': A.formSave(); break;
+      case 'editStart': A.editStart(d.side, d.kind, d.id); break;
+      case 'editSave': A.editSave(); break;
+      case 'editCancel': A.editCancel(); break;
+      case 'storeOrder': A.storeOrder(); break;
+      case 'fulfil': A.fulfil(d.id); break;
+      case 'shopStock': A.shopStock(d.id, +d.d); break;
+      case 'sfStock': A.sfStock(d.id, +d.d); break;
     }
   });
   document.addEventListener('input', e => {
     const t = e.target;
-    if (t.dataset.f) { UI.form[t.dataset.f] = t.value; renderShopTop(); }
-    else if (t.dataset.inv) {
-      const p = S.shop.products.find(x => x.id === t.dataset.inv);
-      if (t.value === String(p.stock)) UI.inv.delete(p.id); else UI.inv.set(p.id, t.value);
-      t.classList.toggle('dirty', UI.inv.has(p.id));
-      renderShopTop();
-    } else if (t.hasAttribute('data-sfin') && UI.sfEdit) {
-      UI.sfEdit.value = t.value;
-      UI.sfEdit.changed = t.value !== UI.sfEdit.orig;
-      t.parentElement.classList.toggle('edited', UI.sfEdit.changed);
-    }
+    if (t.dataset.f && UI.form) UI.form[t.dataset.f] = t.value;
+    else if (t.hasAttribute('data-edit') && UI.edit) UI.edit.value = t.value;
   });
+  document.addEventListener('change', e => { const s = e.target.closest('[data-status]'); if (s) A.sfStatus(s.dataset.status, s.value); });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.hasAttribute && e.target.hasAttribute('data-sfin')) A.sfSave();
-    if (e.key === 'Escape' && UI.sfEdit) A.sfCancel();
+    const t = e.target;
+    if (!t || !t.dataset) return;
+    if (e.key === 'Enter' && t.hasAttribute('data-edit')) { e.preventDefault(); A.editSave(); }
+    else if (e.key === 'Enter' && t.dataset.f) { e.preventDefault(); A.formSave(); }
+    else if (e.key === 'Escape' && t.hasAttribute('data-edit')) A.editCancel();
+    else if (e.key === 'Escape' && t.dataset.f) A.formCancel();
   });
-  $('#btnOrder').addEventListener('click', () => A.storeOrder());
-  $('#btnReplay').addEventListener('click', () => A.resend());
-  $('#outage').addEventListener('change', e => A.outage(e.target.checked));
+  $('#btnResend').addEventListener('click', () => A.resend());
+  $('#btnOutage').addEventListener('click', () => A.outage(!S.eng.sfDown));
   $('#btnReset').addEventListener('click', reset);
 
-  /* ---------------------------------------------------------------- walkthrough player */
-  const player = $('#player'), vid = $('#vid');
-  if (player && !EMBED) {
-    const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
-    const ICON_PAUSE = '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>';
-    const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
-    const sync = () => { player.classList.toggle('paused', vid.paused); $('#pcPlay').innerHTML = vid.paused ? ICON_PLAY : ICON_PAUSE; };
-    const tick = () => {
-      const d = vid.duration || 0;
-      $('#pcFill').style.width = d ? (vid.currentTime / d * 100) + '%' : '0';
-      $('#pcTime').textContent = fmt(vid.currentTime) + ' / ' + fmt(d || 115);
-      if (d && vid.buffered.length) $('#pcBuf').style.width = (vid.buffered.end(vid.buffered.length - 1) / d * 100) + '%';
-    };
-    const toggle = () => { if (player.classList.contains('ended')) return; if (vid.paused) vid.play().catch(() => {}); else vid.pause(); };
-    let uiT;
-    const showUi = () => { player.classList.add('ui'); clearTimeout(uiT); uiT = setTimeout(() => player.classList.remove('ui'), 2200); };
-    vid.addEventListener('play', () => { player.classList.remove('ended'); sync(); });
-    vid.addEventListener('pause', sync);
-    ['timeupdate', 'loadedmetadata', 'progress', 'seeked'].forEach(ev => vid.addEventListener(ev, tick));
-    vid.addEventListener('ended', () => { player.classList.add('ended'); sync(); });
-    vid.addEventListener('click', () => { toggle(); showUi(); });
-    player.addEventListener('mousemove', showUi);
-    $('#pBig').addEventListener('click', () => vid.play().catch(() => {}));
-    $('#pcPlay').addEventListener('click', () => { toggle(); showUi(); });
-    $('#pReplay').addEventListener('click', () => { vid.currentTime = 0; vid.play().catch(() => {}); });
-    $('#pcFull').addEventListener('click', () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (player.requestFullscreen) player.requestFullscreen();
-      else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
-    });
-    const track = $('#pcTrack');
-    const seek = e => { const r = track.getBoundingClientRect(); const x = Math.min(Math.max(e.clientX - r.left, 0), r.width); if (vid.duration) vid.currentTime = x / r.width * vid.duration; tick(); };
-    track.addEventListener('pointerdown', e => { track.setPointerCapture(e.pointerId); track.classList.add('drag'); player.classList.remove('ended'); seek(e); });
-    track.addEventListener('pointermove', e => { if (track.classList.contains('drag')) { seek(e); showUi(); } });
-    track.addEventListener('pointerup', () => track.classList.remove('drag'));
-    document.addEventListener('keydown', e => {
-      if (e.code !== 'Space' || (e.target.closest && e.target.closest('input, textarea, button, select'))) return;
-      const r = player.getBoundingClientRect();
-      if (r.bottom > 0 && r.top < innerHeight) { e.preventDefault(); toggle(); showUi(); }
-    });
-    // stop playing once it's scrolled out of view
-    new IntersectionObserver(([en]) => { if (!en.isIntersecting && !vid.paused) vid.pause(); }, { threshold: 0.2 }).observe(player);
-    sync(); tick();
-    vid.play().catch(() => sync());
-    $('#openVideo').addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(() => { if (vid.ended) vid.currentTime = 0; vid.play().catch(() => {}); }, 500);
-    });
+  // pause background footage that is off screen, and respect reduced motion
+  const vids = [...document.querySelectorAll('video')];
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) vids.forEach(v => { v.removeAttribute('autoplay'); v.pause(); });
+  else if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(list => list.forEach(en => { if (en.isIntersecting) en.target.play().catch(() => {}); else en.target.pause(); }), { threshold: 0.1 });
+    vids.forEach(v => io.observe(v));
   }
-
-  // keep row highlights fading correctly after re-renders
-  const st = document.createElement('style');
-  st.textContent = '.flash > td { animation-delay: var(--d, 0ms) !important; }';
-  document.head.append(st);
 
   function reset() {
     S = freshState();
-    RQ.length = 0; Q.length = 0; flashes.clear();
-    Object.assign(UI, { shopView: 'customers', sfView: 'contacts', form: {}, inv: new Map(), sfEdit: null, sfMenu: null });
-    $('#outage').checked = false;
-    $('#sTop').dataset.mode = '';
+    RQ.length = 0; Q.length = 0; marks.clear();
+    stockTimers.forEach(t => clearTimeout(t)); stockTimers.clear();
+    Object.assign(UI, { shopTab: 'customers', sfTab: 'contacts', form: null, formErr: '', edit: null });
     emptyLog();
     render();
   }
 
   const idle = (retries = false) => new Promise(res => {
-    const t = setInterval(() => { if (!working && !Q.length && !pending && (!retries || !RQ.length)) { clearInterval(t); res(); } }, 100);
+    const t = setInterval(() => { if (!working && !Q.length && !pending && !stockTimers.size && (!retries || !RQ.length)) { clearInterval(t); res(); } }, 100);
   });
 
   reset();

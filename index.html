@@ -3,131 +3,157 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shopify - Salesforce sync (demo)</title>
-  <link rel="preload" as="image" href="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&q=70&fm=jpg">
-  <meta name="description" content="Working demo of a two-way Shopify and Salesforce sync for customers, orders and inventory.">
-  <meta property="og:title" content="Shopify - Salesforce sync (demo)">
-  <meta property="og:image" content="assets/poster.jpg">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23303030'/%3E%3Cpath d='M9 13h12l-3-3M23 19H11l3 3' stroke='%23fff' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <title>Shopify and Salesforce, kept in step</title>
+  <meta name="description" content="A working demo of a two-way sync between Shopify and Salesforce for customers, orders and stock.">
+  <meta property="og:title" content="Shopify and Salesforce, kept in step">
+  <meta property="og:description" content="A working demo of a two-way sync for customers, orders and stock.">
+  <meta property="og:image" content="https://assets.mixkit.co/videos/31218/31218-thumb-1080-0.jpg">
+  <meta name="theme-color" content="#F2EEE5">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23191816'/%3E%3Ctext x='16' y='22.5' font-family='Georgia,serif' font-size='17' font-style='italic' text-anchor='middle' fill='%23F2EEE5'%3Es%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="https://assets.mixkit.co/videos/31218/31218-thumb-1080-0.jpg">
   <link rel="stylesheet" href="styles.css">
-  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 
-<section class="wv" id="top">
-  <div class="wv-bg"></div>
-  <div class="wv-in">
-    <div class="wv-head">
-      <b>Shopify &harr; Salesforce sync</b>
-      <span>Walkthrough &middot; 2 min</span>
-    </div>
-    <div class="player paused" id="player">
-      <video id="vid" src="assets/demo.mp4" poster="assets/poster.jpg" autoplay muted playsinline preload="auto"></video>
-      <button class="p-big" id="pBig" aria-label="Play">
-        <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
-      </button>
-      <div class="p-end" id="pEnd">
-        <button class="p-endbtn" id="pReplay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Watch again</button>
-        <a class="p-endbtn light" href="#live">Try the live demo</a>
-      </div>
-      <div class="pc" id="pc">
-        <button class="pc-btn" id="pcPlay" aria-label="Play or pause"></button>
-        <span class="pc-time" id="pcTime">0:00 / 1:55</span>
-        <div class="pc-track" id="pcTrack"><div class="pc-buf" id="pcBuf"></div><div class="pc-fill" id="pcFill"><i></i></div></div>
-        <button class="pc-btn" id="pcFull" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
-      </div>
-    </div>
-    <a class="wv-cta" href="#live">Try the live demo yourself<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></a>
-  </div>
-</section>
-
-<header class="bar" id="live">
-  <div class="bar-l">
-    <b>Shopify &harr; Salesforce sync</b>
-    <span>Working demo with sample data</span>
-  </div>
-  <div class="bar-r">
-    <button class="pbtn" id="openVideo"><i data-lucide="play"></i>Watch video</button>
-    <button class="pbtn" id="btnReset"><i data-lucide="rotate-ccw"></i>Reset</button>
+<header class="top" id="top">
+  <div class="wrap top-in">
+    <a class="wordmark" href="#top">Shopify <i>&amp;</i> Salesforce</a>
+    <nav>
+      <a href="#demo">The demo</a>
+      <a href="#how">How it works</a>
+      <a href="#map">What syncs</a>
+    </nav>
   </div>
 </header>
 
-<main class="grid">
+<section class="hero">
+  <video class="hero-video" autoplay muted loop playsinline preload="auto"
+         poster="https://assets.mixkit.co/videos/31218/31218-thumb-1080-0.jpg">
+    <source src="https://assets.mixkit.co/videos/31218/31218-720.mp4" type="video/mp4">
+  </video>
+  <div class="hero-shade"></div>
+  <div class="wrap hero-in">
+    <p class="kicker light">A working demo, with sample data</p>
+    <h1>Shopify and Salesforce,<br><i>kept in step.</i></h1>
+    <p class="hero-lede">Customers, orders and stock move between your store and your CRM within seconds, in both directions. The demo below runs in your browser, so click whatever you like.</p>
+    <div class="hero-cta">
+      <a class="btn paper" href="#demo">Try the demo</a>
+      <a class="under light" href="#how">How it works</a>
+    </div>
+  </div>
+  <a class="scroll-cue" href="#demo" aria-label="Scroll to the demo"><span></span></a>
+</section>
 
-  <!-- ============ Shopify admin ============ -->
-  <section class="win shopify" id="shop">
-    <div class="s-top" id="sTop"></div>
-    <div class="s-body">
-      <nav class="s-nav" id="sNav">
-        <a class="dim" data-na><i data-lucide="house"></i>Home</a>
-        <a data-sv="orders" data-q="shop-nav-orders"><i data-lucide="inbox"></i>Orders<span class="s-cnt" id="sOrdCnt"></span></a>
-        <a data-sv="inventory" data-q="shop-nav-products"><i data-lucide="tag"></i>Products</a>
-        <a data-sv="inventory" class="sub" data-q="shop-nav-inventory">Inventory</a>
-        <a data-sv="customers" data-q="shop-nav-customers"><i data-lucide="user"></i>Customers</a>
-        <a class="dim" data-na><i data-lucide="megaphone"></i>Marketing</a>
-        <a class="dim" data-na><i data-lucide="percent"></i>Discounts</a>
-        <a class="dim" data-na><i data-lucide="store"></i>Online Store</a>
-        <a class="dim s-set" data-na><i data-lucide="settings"></i>Settings</a>
-      </nav>
-      <div class="s-main" id="sMain"></div>
+<section class="sec" id="demo">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num"><span>01</span>The demo</div>
+      <h2>Make a change on <i>either side.</i></h2>
+      <p>Add a customer or change stock in Shopify, or edit a phone number or order status in Salesforce. The sync log shows every step it takes, as it happens.</p>
     </div>
-    <div class="s-toast" id="sToast"></div>
-  </section>
 
-  <!-- ============ Salesforce ============ -->
-  <section class="win sfdc" id="sf">
-    <div class="sf-top">
-      <span class="sf-logo"><span class="logo logo-sf"></span></span>
-      <div class="sf-search" data-na><i data-lucide="search"></i>Search...</div>
-      <div class="sf-icons" data-na><i data-lucide="star"></i><i data-lucide="plus"></i><i data-lucide="circle-help"></i><i data-lucide="settings"></i><i data-lucide="bell"></i><span class="sf-av">SC</span></div>
-    </div>
-    <div class="sf-nav" id="sfNav">
-      <span class="sf-launch" data-na><i data-lucide="grip"></i></span>
-      <span class="sf-app" data-na>Sales</span>
-      <a class="dim" data-na>Home</a>
-      <a data-fv="contacts" data-q="sf-nav-contacts">Contacts</a>
-      <a class="dim" data-na>Accounts</a>
-      <a data-fv="orders" data-q="sf-nav-orders">Orders</a>
-      <a data-fv="products" data-q="sf-nav-products">Products</a>
-      <a class="dim" data-na>Reports</a>
-    </div>
-    <div class="sf-page" id="sfPage"></div>
-    <div class="sf-toast" id="sfToast"></div>
-    <div class="sf-down" id="sfDown">
-      <div class="sf-down-card">
-        <i data-lucide="cloud-off"></i>
-        <b>Can't reach Salesforce</b>
-        <span>Simulated outage. Changes from Shopify are queued and retried automatically.</span>
+    <div class="board">
+      <!-- Shopify -->
+      <div class="col" id="shop">
+        <div class="col-head">
+          <span class="col-label">Your store</span>
+          <h3><span class="brand-dot shop"></span>Shopify</h3>
+        </div>
+        <div class="tabs" id="shopTabs"></div>
+        <div class="col-body" id="shopBody"></div>
+      </div>
+
+      <!-- Sync log -->
+      <div class="col log" id="log">
+        <div class="col-head">
+          <span class="col-label">In between</span>
+          <h3>The sync log</h3>
+          <button class="txt reset" id="btnReset">Reset demo</button>
+        </div>
+        <p class="tally" id="tally"></p>
+        <div class="tools">
+          <button class="pill" id="btnResend">Resend last webhook</button>
+          <button class="pill" id="btnOutage">Take Salesforce offline</button>
+        </div>
+        <ol class="entries" id="entries"></ol>
+      </div>
+
+      <!-- Salesforce -->
+      <div class="col" id="sf">
+        <div class="col-head">
+          <span class="col-label">Your CRM</span>
+          <h3><span class="brand-dot sf"></span>Salesforce</h3>
+        </div>
+        <div class="tabs" id="sfTabs"></div>
+        <div class="offline-note">Salesforce is offline for now (simulated). Changes from Shopify are waiting in the retry queue.</div>
+        <div class="col-body" id="sfBody"></div>
       </div>
     </div>
-  </section>
+    <p class="fine">Both systems are simulated here with sample data. The rules are the same ones the real build uses: records matched by Shopify ID, repeated webhooks ignored, the sync's own echoes skipped, and failed writes retried until they go through.</p>
+  </div>
+</section>
 
-  <!-- ============ Sync log ============ -->
-  <section class="log">
-    <div class="log-head">
-      <div class="log-title">
-        <b>Sync log</b>
-        <span id="stats"></span>
-      </div>
-      <div class="log-tools">
-        <span class="tools-label">Test tools</span>
-        <button class="tbtn" id="btnOrder" data-q="tool-order"><i data-lucide="shopping-bag"></i>Simulate store order</button>
-        <button class="tbtn" id="btnReplay" data-q="tool-resend"><i data-lucide="copy"></i>Resend last webhook</button>
-        <label class="tchk" data-q="tool-outage"><input type="checkbox" id="outage"><span class="box"><i data-lucide="check"></i></span>Salesforce outage</label>
-      </div>
+<section class="sec alt" id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num"><span>02</span>How it works</div>
+      <h2>Two teams, <i>one set of records.</i></h2>
+      <p>A small sync service sits between the two systems. Each side tells it the moment something changes, and it writes the change to the other side.</p>
     </div>
-    <div class="log-cols"><span>Time</span><span>Direction</span><span>Event</span><span>Record</span><span>Result</span><span class="r">Took</span></div>
-    <div class="log-body" id="logBody"></div>
-  </section>
-</main>
+
+    <div class="scenes">
+      <figure>
+        <video autoplay muted loop playsinline preload="metadata" poster="https://assets.mixkit.co/videos/42137/42137-thumb-720-0.jpg">
+          <source src="https://assets.mixkit.co/videos/42137/42137-720.mp4" type="video/mp4">
+        </video>
+        <figcaption><b>In the store.</b> An order is packed and marked fulfilled in Shopify. Salesforce shows it seconds later.</figcaption>
+      </figure>
+      <figure>
+        <video autoplay muted loop playsinline preload="metadata" poster="https://assets.mixkit.co/videos/42652/42652-thumb-720-0.jpg">
+          <source src="https://assets.mixkit.co/videos/42652/42652-720.mp4" type="video/mp4">
+        </video>
+        <figcaption><b>In the office.</b> Sales update a customer's details in Salesforce, and the store has them straight away.</figcaption>
+      </figure>
+    </div>
+
+    <ol class="points">
+      <li><span>01</span><div><b>Shopify speaks first.</b> Signed webhooks arrive the moment a customer, order or stock level changes. Anything without a valid signature is turned away.</div></li>
+      <li><span>02</span><div><b>Matched, never duplicated.</b> Every Salesforce record keeps its Shopify ID, so a change updates the right record. A webhook sent twice is only processed once.</div></li>
+      <li><span>03</span><div><b>Salesforce answers back.</b> Change Data Capture reports edits made by your team, and the sync writes them to Shopify. Its own writes are recognised, so nothing loops.</div></li>
+      <li><span>04</span><div><b>Nothing gets lost.</b> If either side is down, changes wait in a retry queue and go through once it's back. Every step is logged with a reason.</div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="sec" id="map">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num"><span>03</span>What syncs</div>
+      <h2>Standard objects, <i>both sides.</i></h2>
+      <p>The mapping lives in one plain settings file, so it can change later without touching the code.</p>
+    </div>
+    <table class="map">
+      <thead><tr><th>Shopify</th><th>Salesforce</th><th>Direction</th><th>Fields</th></tr></thead>
+      <tbody>
+        <tr><td>Customer</td><td>Account and Contact</td><td>Both ways</td><td>Name, email, phone, addresses, email opt-out</td></tr>
+        <tr><td>Product and variant</td><td>Product and Price Book Entry</td><td>Shopify to Salesforce</td><td>Title, SKU, price, active</td></tr>
+        <tr><td>Order</td><td>Order and Order Products</td><td>Shopify to Salesforce</td><td>Number, date, totals, addresses, line items</td></tr>
+        <tr><td>Order status</td><td>Order Status</td><td>Both ways</td><td>Paid, fulfilled, cancelled, refunded</td></tr>
+        <tr><td>Stock level</td><td>Product stock field</td><td>Both ways</td><td>Available quantity per SKU</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <footer class="foot">
-  Sample data only. Shopify and Salesforce are simulated in your browser, so it's safe to click anything. The sync rules are the same as the real build: records matched by Shopify ID, repeated webhooks ignored, echoes of the sync's own writes skipped, and failed writes retried.
+  <div class="wrap foot-in">
+    <span>Prepared by Ricardo Jose</span>
+    <span>Sample data only. Footage from Mixkit, photos from Unsplash. Shopify and Salesforce are trademarks of their owners.</span>
+  </div>
 </footer>
-
 
 <script src="app.js"></script>
 </body>

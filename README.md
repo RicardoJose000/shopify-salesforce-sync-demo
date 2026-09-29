@@ -1,25 +1,18 @@
-# Shopify + Salesforce Real-Time Sync - Live Demo
+# Shopify and Salesforce, kept in step
 
-Working demo of a two-way, real-time sync between Shopify and Salesforce.
-Customers, orders and inventory move both ways within seconds.
+A working demo of a two-way sync between Shopify and Salesforce for customers, orders and stock.
 
-**Live demo:** https://ricardojose000.github.io/shopify-salesforce-sync-demo/
+**Open the demo:** https://ricardojose000.github.io/shopify-salesforce-sync-demo/
 
-![Demo](assets/poster.jpg)
+Both systems are simulated in the browser with sample data, so it's safe to click anything.
+The sync rules are the same ones used in the real build:
 
-## What the demo shows
+- records matched by Shopify ID, so nothing is duplicated
+- a webhook delivered twice is only processed once
+- the sync's own writes are recognised on the way back, so updates never loop
+- if a side is down, changes wait in a retry queue and go through once it's back
 
-- New customer in Shopify becomes a Contact in Salesforce
-- Orders arrive with their Order Products, stock levels follow
-- A webhook delivered twice is only processed once
-- Changes made in Salesforce flow back to Shopify, and the echo is skipped (no loops)
-- Salesforce outage: changes wait in a retry queue with back-off, then catch up
+Real build: Shopify webhooks (HMAC checked) into a small sync service, upserts to Salesforce by Shopify ID,
+and Salesforce Change Data Capture back to the Shopify Admin API.
 
-## How the real build works
-
-- Shopify webhooks (HMAC verified) -> sync service -> Salesforce REST API, upsert by Shopify ID
-- Salesforce Change Data Capture -> sync service -> Shopify Admin API
-- Event log for duplicate blocking, ID map, retry queue, and a plain sync rules file
-
-Both platforms are simulated in the browser here so it's safe to click anything.
-The sync rules are the same ones used in the real build.
+Footage from Mixkit, photos from Unsplash. Shopify and Salesforce are trademarks of their owners.
